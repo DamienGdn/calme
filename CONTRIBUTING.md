@@ -10,7 +10,7 @@ so that everyone gets them in the official releases.
 3. Run the checks:
    ```bash
    pnpm install
-   pnpm test                  # server tests
+   pnpm test                  # server (Vitest) and web (node:test) tests
    pnpm -C server typecheck
    pnpm build                 # Vue UI (vue-tsc + vite)
    ```
@@ -22,13 +22,10 @@ so that everyone gets them in the official releases.
   guards around Claude (`claude -p` with no tools, JSON schemas, mail content treated as untrusted data).
 - Every user-facing string goes through `web/src/i18n.ts`, in **English and French**.
 - Server code is TypeScript run natively by Node 24: relative imports with the `.ts` extension, no enums or namespaces.
-- New behaviour comes with tests (Vitest, `server/test`).
+- New behaviour comes with tests (Vitest in `server/test`, `node:test` in `web/test`).
 - No personal data, tokens or `credentials.json` in commits.
 
 ## Licensing of contributions
 
-Calme is licensed under the MIT License with the **Commons Clause** (see [LICENSE](LICENSE)): you can use, fork and
-modify it, but you may not sell it or a product/service whose value derives substantially from it.
-
-By submitting a contribution, you agree that it is licensed under the same terms as the project and that the
-maintainer may include it in Calme and in future versions of Calme under these terms.
+Calme is released under the [MIT License](LICENSE). By submitting a contribution, you agree that it is licensed under
+the same terms.

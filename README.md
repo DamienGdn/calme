@@ -7,6 +7,7 @@
   <img alt="macOS · Windows · Linux · iPhone" src="https://img.shields.io/badge/macOS%20%C2%B7%20Windows%20%C2%B7%20Linux%20%C2%B7%20iPhone-0D0E11?style=flat-square" />
   <img alt="Vue 3 + TypeScript" src="https://img.shields.io/badge/Vue%203-TypeScript-0D0E11?style=flat-square" />
   <img alt="English · Français" src="https://img.shields.io/badge/English%20%C2%B7%20Fran%C3%A7ais-0D0E11?style=flat-square" />
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0D0E11?style=flat-square" /></a>
 </p>
 
 # Calme
@@ -59,11 +60,32 @@ It runs on your own computer and uses **your Claude Code subscription** (`claude
 ### 2. Desktop app (recommended)
 
 Download the installer for your system from the [latest release](../../releases/latest):
-`.dmg` (macOS, Apple silicon or Intel), `.exe` (Windows) or `.AppImage` (Linux). The builds are not code-signed:
+`.dmg` (macOS — `arm64` for Apple silicon, the other one for Intel), `.exe` (Windows) or `.AppImage` (Linux).
 
-- **macOS** — drag Calme to Applications, then right-click › *Open* the first time.
-- **Windows** — *More info* › *Run anyway*.
-- **Linux** — `chmod +x Calme-*.AppImage` and run it.
+The installers are **not code-signed** (signing costs a yearly fee that this side project does not pay), so macOS and
+Windows warn you the first time. This is expected; you only do it once.
+
+**macOS** (Sequoia 15 and later)
+1. Open the `.dmg` and drag **Calme** onto **Applications**.
+2. Open Calme from Applications. macOS says it *could not verify* Calme: click **Done** (not *Move to Bin*).
+3. Open **System Settings › Privacy & Security**, scroll to *Security*: next to *“Calme” was blocked…*, click
+   **Open Anyway**, confirm with your password or Touch ID, then **Open**.
+4. From now on Calme opens normally.
+
+On macOS 14 or earlier, right-click Calme in Applications › **Open** › **Open** is enough. If macOS ever says Calme
+*is damaged and can't be opened* (the quarantine flag of the download), run once in Terminal:
+`xattr -dr com.apple.quarantine /Applications/Calme.app`.
+
+**Windows** (10 and 11)
+1. If your browser flags the download, keep it (Edge: *…* › *Keep* › *Show more* › *Keep anyway*).
+2. Run `Calme.Setup.x.y.z.exe`. On the blue *Windows protected your PC* screen, click **More info**, then
+   **Run anyway**.
+3. The installer sets Calme up for your user and opens it.
+
+If Windows 11 *Smart App Control* is on, it blocks unsigned apps with no way around it; run Calme from source instead
+(below) — turning Smart App Control off cannot be undone without reinstalling Windows.
+
+**Linux** — `chmod +x Calme-*.AppImage` and run it.
 
 The app runs the Calme server in the background, starts at login (toggle in the menu bar icon menu), shows the number
 of mails to answer in the menu bar and notifies you of every new mail. Logs: `~/.calme/server.log`.
@@ -78,11 +100,17 @@ Google requires every app to have its own OAuth client. It is free.
 1. Open <https://console.cloud.google.com>, create a project.
 2. *APIs & Services › Library*: enable **Gmail API** and **Google Calendar API**.
 3. *Google Auth Platform › Branding*: app type **External**, name it, add your address as support and developer contact.
-4. *Audience*: add your Gmail address as a **test user**. (In *Testing* mode Google signs you out every 7 days;
-   publishing to *Production* requires a public home page and privacy policy URL.)
+4. *Audience*: add your Gmail address as a **test user**.
 5. *Clients › Create client*: type **Desktop app**. Download the JSON.
-6. Save it as `~/.calme/credentials.json` (Windows: `C:\Users\<you>\.calme\credentials.json`).
-7. Restart Calme and, **on that computer**, open <http://127.0.0.1:4747/auth/google>.
+6. Drop the JSON into the setup assistant (or save it as `~/.calme/credentials.json`;
+   Windows: `C:\Users\<you>\.calme\credentials.json`), then click **Connect Gmail**: your browser opens Google's
+   consent page, and Calme moves on by itself once you accept.
+
+**Stay connected for good.** While the app is in *Testing*, Google signs you out every 7 days. To avoid that, publish
+it: in *Branding*, fill *Application home page* (e.g. `https://github.com/DamienGdn/calme`) and *Privacy policy*
+(e.g. this repository's [`PRIVACY.md`](PRIVACY.md)), save, then *Audience › Publish app*. You don't need Google's
+verification for your own use: the consent page shows *Google hasn't verified this app* — click *Advanced* ›
+*Go to Calme (unsafe)* — and the app is limited to 100 users. Reconnect once after publishing (*Admin*).
 
 Calme asks for three permissions: read and organise mail (`gmail.modify` — no permanent deletion possible), send mail
 (`gmail.send`) and read/create calendar events (`calendar.events`). Tokens stay in `~/.calme/`, readable by you only.
@@ -90,10 +118,10 @@ Calme asks for three permissions: read and organise mail (`gmail.modify` — no 
 ### 4. iPhone
 
 1. Install [Tailscale](https://tailscale.com) on the computer and the iPhone (same account); enable MagicDNS and HTTPS.
-2. On the computer: `tailscale serve --bg 4747` — Calme is now reachable at
-   `https://<computer>.<tailnet>.ts.net`, **only from your own devices**.
-3. On the iPhone, open that address in Safari › *Share* › *Add to Home Screen*.
-4. Open Calme from the icon, paste the pairing token (`pnpm calme pair`), then *Enable notifications*.
+2. In Calme on the computer: *Admin › iPhone › Share Calme with my iPhone*. Calme becomes reachable at
+   `https://<computer>.<tailnet>.ts.net`, **only from your own devices**, and shows a QR code.
+3. Scan it with the iPhone camera: Safari opens Calme already paired. *Share* › *Add to Home Screen*.
+4. Open Calme from the icon, then *Enable notifications* (choose what to receive in *Admin › Notifications*).
 
 ## Run from source
 
@@ -134,7 +162,7 @@ This repository is set up for Claude Code (`CLAUDE.md`). Two slash commands driv
 ## Development
 
 ```bash
-pnpm test                 # server tests (Vitest)
+pnpm test                 # server (Vitest) and web (node:test) tests
 pnpm -C web dev           # UI dev server (proxies /api to :4747)
 pnpm -C server typecheck
 ```
@@ -143,9 +171,8 @@ pnpm -C server typecheck
 
 ## License
 
-MIT with the [Commons Clause](LICENSE): free to use, fork and modify — **not for sale** (you may not sell Calme or a
-product or service whose value derives substantially from it). Contributions are welcome through pull requests on
-this repository — see [CONTRIBUTING.md](CONTRIBUTING.md).
+[MIT](LICENSE). Contributions are welcome through pull requests — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Privacy policy: [PRIVACY.md](PRIVACY.md).
 
 ---
 

@@ -97,5 +97,5 @@
     "electron-builder": "^26.18.0",
     "esbuild": "0.25.12"
   },
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "MIT"
 }
