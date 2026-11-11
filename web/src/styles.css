@@ -292,7 +292,7 @@ button { cursor: pointer; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .status { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
-.grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 14px; align-items: start; }
+.grid-cards { display: grid; gap: 14px; }
 .switch { display: flex; align-items: center; gap: 12px; font-size: 14px; cursor: pointer; }
 .switch input { width: 22px; height: 22px; accent-color: var(--accent); }
 .select { min-height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surf2); }
@@ -418,21 +418,27 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .compose-box { display: flex; flex-direction: column; gap: 10px; margin: 14px 24px 0; padding: 16px; border-radius: 16px; background: var(--surf2); }
 .compose-box textarea { width: 100%; border: 0; outline: none; resize: vertical; background: transparent; font-family: 'Instrument Serif', Georgia, serif; font-size: 20px; line-height: 1.35; }
 
-/* Admin: equal-size cards. Every row takes the height of the tallest card; a lone last card fills its row. */
-.grid-cards { align-items: stretch; }
-.grid-cards > .card { height: 100%; box-sizing: border-box; }
-@media (min-width: 1100px) {
-  /* 7 cards: two rows of equal height, then the last card on its own row at its natural height. */
-  .grid-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, 1fr) auto; }
+/* Admin: as many columns as fit (cards at least 340px), equal-height rows, a lone last card fills its row.
+   Sized on the space Calme actually has (container queries), not the window: the sidebar takes part of it. */
+.cards-wrap { container-type: inline-size; }
+.grid-cards { grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); align-items: stretch; }
+.grid-cards > .card { height: 100%; box-sizing: border-box; min-width: 0; container-type: inline-size; }
+@container (min-width: 694px) { .grid-cards { grid-auto-rows: 1fr; } }
+@container (min-width: 694px) and (max-width: 1047.98px) { .grid-cards > .card:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@container (min-width: 1048px) {
   .grid-cards > .card:last-child:nth-child(3n + 1) { grid-column: 1 / -1; }
   .grid-cards > .card:last-child:nth-child(3n + 2) { grid-column: span 2; }
 }
-@media (min-width: 721px) and (max-width: 1099px) {
-  .grid-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(3, 1fr) auto; }
-  .grid-cards > .card:last-child:nth-child(2n + 1) { grid-column: 1 / -1; }
+/* Inside a card: controls never wider than the card; labels above values when the card is narrow,
+   details laid out horizontally when a card spans the whole row. */
+.select { max-width: 100%; min-width: 0; }
+.kv dd .select { width: 100%; }
+@container (max-width: 380px) {
+  .kv { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .kv dt { font-size: 12px; }
+  .kv dd { margin-bottom: 8px; }
 }
-/* The full-width last card lays its details out horizontally. */
-@media (min-width: 1100px) { .grid-cards > .card:last-child:nth-child(3n + 1) .kv { grid-template-columns: repeat(4, max-content minmax(0, 1fr)); } }
+@container (min-width: 900px) { .kv { grid-template-columns: repeat(4, max-content minmax(0, 1fr)); } }
 
 /* Mac desktop app (hidden title bar): space for the window buttons, and the top strip drags the window. */
 /* Opaque strip pinned at the top of the scrolling sidebar: content scrolls under it, never under the traffic lights. */
@@ -471,6 +477,3 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .setup-foot { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 
 .device { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surf2); font-size: 14px; }
-/* Admin with 9 cards: three equal rows. */
-@media (min-width: 1100px) { .grid-cards { grid-template-rows: none; grid-auto-rows: 1fr; } }
-@media (min-width: 721px) and (max-width: 1099px) { .grid-cards { grid-template-rows: none; grid-auto-rows: 1fr; } }

@@ -6,3 +6,6 @@ dist/
 .env
 desktop/out/
 desktop/app/
+
+# Duplicates made by iCloud/Finder sync conflicts ("file 2.ts")
+* 2.*

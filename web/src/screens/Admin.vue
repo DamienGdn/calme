@@ -110,7 +110,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
       <template v-else><span class="hot">{{ t('admin.check') }}</span> {{ t('admin.checkRest') }} <em>{{ t('admin.checkEm') }}</em></template>
     </h1>
 
-    <div class="grid-cards">
+    <div class="cards-wrap"><div class="grid-cards">
       <section class="card" aria-labelledby="a-claude">
         <h2 id="a-claude">{{ t('admin.engine') }}</h2>
         <span :class="['status', v.claude.installed ? 'ok' : 'ko']"><span class="dot" aria-hidden="true" /> {{ v.claude.installed ? t('admin.installed') : t('admin.notFound') }}</span>
@@ -236,6 +236,6 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           </dd>
         </dl>
       </section>
-    </div>
+    </div></div>
   </template>
 </template>
