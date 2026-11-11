@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, CAT_COLOR, post, useMailBody, when, type MailItem } from '../api.ts';
+import { api, CAT_COLOR, post, useMailBody, when, type MailItem, fullDate } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
@@ -68,6 +68,7 @@ function eventDate(start: string, end: string) {
       <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">
         {{ mail.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ mail.fromEmail }}&gt;</span>
       </span>
+      <time class="mail-date" :datetime="new Date(mail.date).toISOString()">{{ fullDate(mail.date) }}</time>
     </div>
 
     <section v-if="a" class="claude-box" :aria-label="t('reader.calmeRead')">

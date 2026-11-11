@@ -837,3 +837,22 @@ html { font-optical-sizing: auto; }
   .month { grid-template-columns: 22px repeat(7, minmax(0, 1fr)); }
   .month-wn { padding-top: 8px; font-size: 9px; }
 }
+
+/* Search answer: the gist first, the detail folds after a few lines, the timeline behind its title. */
+.answer-lead { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 21px; line-height: 1.35; color: var(--ink); text-wrap: pretty; }
+.answer { display: flex; flex-direction: column; gap: 10px; }
+.answer p { margin: 0; }
+.answer strong, .answer-lead strong { font-weight: 600; color: var(--ink); }
+.answer.clamped { max-height: 7.2em; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent); mask-image: linear-gradient(180deg, #000 55%, transparent); }
+.fold { justify-self: start; align-self: flex-start; color: var(--accent-text); font-weight: 600; text-decoration: none; }
+.points-box { border-top: 1px solid var(--line); padding-top: 10px; }
+.points-box summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--ink); }
+.points-box summary::-webkit-details-marker { display: none; }
+.points-box summary::before { content: '›'; display: inline-block; width: 12px; color: var(--accent-text); transition: transform 0.2s; }
+.points-box[open] summary::before { transform: rotate(90deg); }
+.points-box .points { margin-top: 10px; }
+@media (max-width: 720px) { .answer-lead { font-size: 19px; } }
+
+/* Full date and time of the opened mail. */
+.mail-date { display: block; font-size: 13px; color: var(--muted); }
+.mail-date::first-letter { text-transform: uppercase; }

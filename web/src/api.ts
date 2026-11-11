@@ -87,6 +87,16 @@ export const CAT_COLOR: Record<Category, string> = {
 };
 export const CAT_CLASS: Record<Category, string> = { reply: 'c-reply', read: 'c-read', news: 'c-news', trash: 'c-trash' };
 
+/** Full date and time of a mail, e.g. "jeudi 12 novembre 2026 à 18:56". */
+export function fullDate(ts: number): string {
+  const d = new Date(ts);
+  const loc = dateLocale();
+  return i18n.global.t('common.at', {
+    day: d.toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+    time: d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }),
+  });
+}
+
 /** Short, human date: time today, "yesterday", weekday this week, else day + month. */
 export function when(ts: number): string {
   const loc = dateLocale();

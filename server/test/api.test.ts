@@ -359,6 +359,7 @@ describe('api ai search', () => {
     expect(body.results[0].relevant).toBe(true);
     expect(g.calls.find((c) => c.method === 'listInboxIds')?.args).toEqual(['from:syndic AG', 30]);
     expect(Array.isArray(body.points)).toBe(true);
+    expect(body.lead).toBe('');
   });
 
   it('covers a broad topic: always asks Gmail too, even when the local base already has many mails', async () => {

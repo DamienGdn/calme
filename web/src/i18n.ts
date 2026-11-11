@@ -5,6 +5,7 @@ const KEY = 'calme.lang';
 
 const fr = {
   common: {
+    at: '{day} à {time}',
     cancel: 'Annuler',
     close: 'Fermer',
     undo: 'Annuler',
@@ -322,6 +323,9 @@ const fr = {
     count: 'Aucun mail | 1 mail | {n} mails',
   },
   search: {
+    readMore: 'Lire la suite',
+    readLess: 'Replier',
+    timeline: 'Chronologie ({n})',
     eyebrow: 'Recherche IA · toute ta boîte Gmail',
     label: 'Question à Calm',
     placeholder: 'Demande à Calm : « quand est l’AG du syndic ? »',
@@ -536,6 +540,7 @@ type Messages = typeof fr;
 
 const en: Messages = {
   common: {
+    at: '{day} at {time}',
     cancel: 'Cancel',
     close: 'Close',
     undo: 'Undo',
@@ -853,6 +858,9 @@ const en: Messages = {
     count: 'No mail | 1 mail | {n} mails',
   },
   search: {
+    readMore: 'Read more',
+    readLess: 'Fold',
+    timeline: 'Timeline ({n})',
     eyebrow: 'AI search · your whole Gmail',
     label: 'Question for Calm',
     placeholder: 'Ask Calm: “when is the residents’ meeting?”',

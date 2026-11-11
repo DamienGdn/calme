@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, useMailBody, when, type MailItem } from '../api.ts';
+import { api, useMailBody, when, type MailItem, fullDate } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import MailBody from '../components/MailBody.vue';
 import { notifyError } from '../store.ts';
@@ -121,6 +121,7 @@ const parentPath = (l: Label) => l.name.split('/').slice(0, -1).join(' / ');
           <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
             <h2>{{ open.subject || t('common.noSubject') }}</h2>
             <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">{{ open.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ open.fromEmail }}&gt;</span></span>
+            <time class="mail-date" :datetime="new Date(open.date).toISOString()">{{ fullDate(open.date) }}</time>
           </div>
           <MailBody :mail-id="open.id" :text="body ?? open.snippet" source="gmail" />
         </article>
