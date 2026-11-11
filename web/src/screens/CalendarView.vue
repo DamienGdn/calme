@@ -5,6 +5,7 @@ import { api } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notifyError } from '../store.ts';
+import { useMedia } from '../tabs.ts';
 
 interface CalEvent {
   title: string;
@@ -20,7 +21,10 @@ export interface PendingEvent {
 }
 type Item = CalEvent & { kind: 'agenda' | 'proposed' | 'conflict' };
 
-/** Week (hour grid) and month (6×7 grid) views over Google Calendar plus events proposed by mails. */
+/**
+ * Week (hour grid) and month (6×7 grid) views over Google Calendar plus events proposed by mails.
+ * On the phone the week reads as a diary (one page per day) and the month as a dotted grid: tap a day to read it.
+ */
 const props = defineProps<{ mode: 'semaine' | 'mois'; pending: PendingEvent[] }>();
 const { t } = useI18n();
 
@@ -83,6 +87,17 @@ const byDay = computed(() => {
   return map;
 });
 const today = key(new Date());
+const phone = useMedia('(max-width: 720px)');
+/** Day shown under the month grid on the phone: today when it is in view, else the 1st. */
+const sel = ref(today);
+watch(first, () => {
+  const inView = days.value.some((d) => key(d) === today && d.getMonth() === anchor.value.getMonth());
+  sel.value = inView ? today : key(new Date(anchor.value.getFullYear(), anchor.value.getMonth(), 1));
+}, { immediate: true });
+/** A day's events in reading order: all-day first, then by start time. */
+const dayItems = (k: string) =>
+  [...(byDay.value.get(k) ?? [])].sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.localeCompare(b.start));
+const fromKey = (k: string) => new Date(k + 'T12:00:00');
 const timed = (d: Date) => (byDay.value.get(key(d)) ?? []).filter((e) => !e.allDay);
 const allDay = (d: Date) => (byDay.value.get(key(d)) ?? []).filter((e) => e.allDay);
 function place(e: Item) {
@@ -103,14 +118,22 @@ function place(e: Item) {
       <button type="button" class="btn btn-icon" style="transform: scaleX(-1)" :aria-label="mode === 'semaine' ? t('agenda.cal.nextWeek') : t('agenda.cal.nextMonth')" @click="shift(1)">
         <Icon name="back" :size="16" />
       </button>
-      <h2 class="serif" style="margin: 0; font-size: 30px; font-weight: 400; text-transform: capitalize">{{ title }}</h2>
+      <h2 class="serif cal-title">{{ title }}</h2>
       <span v-if="!events" class="muted" style="font-size: 13px">{{ t('common.loading') }}</span>
     </div>
 
     <div v-if="mode === 'mois'" class="month">
       <span v-for="w in weekdays" :key="w" class="month-wd mono">{{ w }}</span>
-      <div v-for="d in days" :key="key(d)" :class="['month-cell', { out: d.getMonth() !== anchor.getMonth(), today: key(d) === today }]">
+      <button
+        v-for="d in days"
+        :key="key(d)"
+        type="button"
+        :class="['month-cell', { out: d.getMonth() !== anchor.getMonth(), today: key(d) === today, sel: phone && sel === key(d) }]"
+        :aria-pressed="phone ? sel === key(d) : undefined"
+        @click="sel = key(d)"
+      >
         <span class="month-n">{{ d.getDate() }}</span>
+        <span class="month-dots" aria-hidden="true"><i v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)" :key="i" :class="e.kind" /></span>
         <span
           v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)"
           :key="i"
@@ -119,11 +142,30 @@ function place(e: Item) {
         >
           <span v-if="!e.allDay" class="mono">{{ hm(e.start) }}</span> {{ e.title }}
         </span>
-        <span v-if="(byDay.get(key(d)) ?? []).length > 3" class="muted" style="font-size: 11px">+{{ (byDay.get(key(d)) ?? []).length - 3 }}</span>
+        <span v-if="(byDay.get(key(d)) ?? []).length > 3" class="muted more" style="font-size: 11px">+{{ (byDay.get(key(d)) ?? []).length - 3 }}</span>
+      </button>
+    </div>
+
+    <!-- Phone: the diary. Month: the day tapped in the grid. Week: one page per day. -->
+    <div v-if="phone" class="timeline carnet">
+      <div v-for="k in mode === 'mois' ? [sel] : days.map(key)" :key="k" :class="['tl-day', { today: k === today }]">
+        <div class="tl-date">
+          <span class="tl-n">{{ fromKey(k).getDate() }}</span>
+          <span class="tl-wd">{{ k === today ? t('common.today') : fromKey(k).toLocaleDateString(dateLocale(), { weekday: 'long' }) }}</span>
+          <span class="eyebrow" style="padding: 0">{{ fromKey(k).toLocaleDateString(dateLocale(), { month: 'long' }) }}</span>
+        </div>
+        <div class="tl-evs">
+          <div v-for="(e, i) in dayItems(k)" :key="i" :class="['tl-ev', { prop: e.kind !== 'agenda', conflict: e.kind === 'conflict' }]">
+            <span class="mono muted tl-time"><span>{{ e.allDay ? t('agenda.allDay') : hm(e.start) }}</span><span v-if="!e.allDay" class="tl-t2">{{ hm(e.end) }}</span></span>
+            <span style="font-size: 15px">{{ e.title }}</span>
+            <span class="mono tag">{{ e.kind === 'agenda' ? t('agenda.tagAgenda') : t('agenda.tagProposed') }}</span>
+          </div>
+          <p v-if="!dayItems(k).length" class="tl-free">{{ t('agenda.cal.free') }}</p>
+        </div>
       </div>
     </div>
 
-    <div v-else class="week-wrap">
+    <div v-else-if="!phone" class="week-wrap">
       <div class="week" :style="{ gridTemplateRows: `auto auto ${(DAY_END - DAY_START) * HOUR_PX}px` }">
         <span />
         <span v-for="d in days" :key="'h' + key(d)" :class="['week-day', { today: key(d) === today }]">

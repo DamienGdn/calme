@@ -72,6 +72,11 @@ export function openStore(path: string) {
       for (const a of list) setAnalysis.run(JSON.stringify(a), a.id);
     },
 
+    /** Moves a sorted mail to another category (e.g. "to answer" → "to read" once handled), keeping the rest. */
+    setCategory(id: string, category: Category): void {
+      db.prepare("UPDATE messages SET analysis = json_set(analysis, '$.category', ?) WHERE id = ? AND analysis IS NOT NULL").run(category, id);
+    },
+
     listInbox(cat?: Category): MailView[] {
       const rows = db.prepare('SELECT data, analysis FROM messages WHERE in_inbox = 1 ORDER BY date DESC').all() as Row[];
       const views = rows.map(toView);

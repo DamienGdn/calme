@@ -23,7 +23,9 @@ interface Proposal {
   added: string | null;
 }
 interface Row {
-  time: string;
+  /** Start and end times; for an all-day event, t1 is "All day" and t2 is empty. */
+  t1: string;
+  t2: string;
   title: string;
   tag: 'agenda' | 'proposed';
   conflict: boolean;
@@ -71,11 +73,13 @@ const rowsByDay = computed(() => {
   const map = new Map<string, Row[]>();
   const push = (k: string, r: Row) => map.set(k, [...(map.get(k) ?? []), r]);
   for (const e of view.value?.events ?? []) {
-    if (e.allDay) push(e.start, { time: t('agenda.allDay'), title: e.title, tag: 'agenda', conflict: false });
-    else push(localDay(new Date(e.start)), { time: `${time(e.start)}–${time(e.end)}`, title: e.title, tag: 'agenda', conflict: false });
+    if (e.allDay) push(e.start, { t1: t('agenda.allDay'), t2: '', title: e.title, tag: 'agenda', conflict: false });
+    else push(localDay(new Date(e.start)), { t1: time(e.start), t2: time(e.end), title: e.title, tag: 'agenda', conflict: false });
   }
   for (const p of view.value?.proposals ?? [])
-    if (!p.added) push(localDay(new Date(p.event.start)), { time: `${time(p.event.start)}–${time(p.event.end)}`, title: p.event.title, tag: 'proposed', conflict: Boolean(p.conflict) });
+    if (!p.added) push(localDay(new Date(p.event.start)), { t1: time(p.event.start), t2: time(p.event.end), title: p.event.title, tag: 'proposed', conflict: Boolean(p.conflict) });
+  // Each day reads in time order (all-day first).
+  for (const rows of map.values()) rows.sort((a, b) => (a.t2 ? a.t1 : '') .localeCompare(b.t2 ? b.t1 : ''));
   return map;
 });
 const pending = computed(() => (view.value?.proposals ?? []).filter((p) => !p.added));
@@ -88,8 +92,8 @@ const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ?
 <template>
   <header class="topbar">
     <span class="eyebrow">{{ t('agenda.eyebrow') }}</span>
-    <button type="button" class="btn btn-prim" :aria-expanded="form" @click="form = !form"><Icon name="calendar" :size="16" /> {{ t('agenda.newEvent') }}</button>
-    <a class="btn" href="https://calendar.google.com" target="_blank" rel="noopener noreferrer">{{ t('agenda.openGoogle') }}</a>
+    <a class="btn" href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" :aria-label="t('agenda.openGoogle')"><span class="wide-only">{{ t('agenda.openGoogle') }}</span><span class="phone-only">Google ↗</span></a>
+    <button type="button" class="btn btn-prim" :aria-expanded="form" :aria-label="t('agenda.newEvent')" @click="form = !form"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
   </header>
 
   <h1 class="headline" style="max-width: 18ch">
@@ -162,16 +166,15 @@ const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ?
       <section aria-labelledby="days" style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
         <h2 id="days" class="eyebrow" style="margin: 0; font-weight: 500">{{ t('agenda.yourAgenda') }}{{ day ? ` · ${fullDay(day)}` : '' }}</h2>
         <div class="timeline">
-          <div v-for="k in visibleDays" :key="k" class="tl-day">
-            <div style="display: flex; flex-direction: column; gap: 2px">
-              <span class="serif" style="font-size: 26px; line-height: 1; text-transform: capitalize">
-                {{ k === localDay(today) ? t('common.today') : new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' }) }} {{ new Date(k + 'T12:00:00').getDate() }}
-              </span>
+          <div v-for="k in visibleDays" :key="k" :class="['tl-day', { today: k === localDay(today) }]">
+            <div class="tl-date">
+              <span class="tl-n">{{ new Date(k + 'T12:00:00').getDate() }}</span>
+              <span class="tl-wd">{{ k === localDay(today) ? t('common.today') : new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' }) }}</span>
               <span class="eyebrow" style="padding: 0">{{ new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { month: 'long' }) }}</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 6px">
+            <div class="tl-evs">
               <div v-for="(r, j) in rowsByDay.get(k)" :key="j" :class="['tl-ev', { prop: r.tag !== 'agenda', conflict: r.conflict }]">
-                <span class="mono muted" style="font-size: 13px">{{ r.time }}</span>
+                <span class="mono muted tl-time"><span>{{ r.t1 }}</span><span v-if="r.t2" class="tl-t2">{{ r.t2 }}</span></span>
                 <span style="font-size: 15px">{{ r.title }}</span>
                 <span class="mono tag">{{ r.tag === 'agenda' ? t('agenda.tagAgenda') : t('agenda.tagProposed') }}</span>
               </div>

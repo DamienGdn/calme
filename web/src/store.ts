@@ -1,6 +1,27 @@
 import { reactive, ref } from 'vue';
 import { api, getToken, setToken, Unauthorized, type AppState } from './api.ts';
 
+/** Liquid glass of the phone menu bar: refraction strength (0 = off), blur (px) and tint (% of the surface colour). */
+export interface Glass {
+  refraction: number;
+  blur: number;
+  tint: number;
+}
+export const GLASS_DEFAULT: Glass = { refraction: 28, blur: 6, tint: 42 };
+const clampGlass = (g: Partial<Glass>): Glass => ({
+  refraction: Math.min(80, Math.max(0, Number(g.refraction ?? GLASS_DEFAULT.refraction))),
+  blur: Math.min(24, Math.max(0, Number(g.blur ?? GLASS_DEFAULT.blur))),
+  tint: Math.min(90, Math.max(0, Number(g.tint ?? GLASS_DEFAULT.tint))),
+});
+
+function readGlass(): Glass {
+  try {
+    return clampGlass(JSON.parse(localStorage.getItem('calme.glass') ?? '{}'));
+  } catch {
+    return { ...GLASS_DEFAULT };
+  }
+}
+
 /** App-wide state shared by every screen: mailbox state, toast, theme and the pairing status. */
 export const store = reactive({
   paired: Boolean(getToken()),
@@ -10,6 +31,8 @@ export const store = reactive({
   theme: document.documentElement.dataset.theme || 'dark',
   /** Per-device choice: follow the device (iPhone, Mac…) or a fixed theme. */
   themePref: readThemePref(),
+  /** Per-device look of the phone menu bar's liquid glass. */
+  glass: readGlass(),
 });
 
 export interface Draft {
@@ -103,3 +126,21 @@ export function openEditor(d: Draft) {
   draft.value = d;
   goTo('ecrire');
 }
+
+function applyGlass() {
+  const s = document.documentElement.style;
+  s.setProperty('--glass-blur', `${store.glass.blur}px`);
+  s.setProperty('--glass-tint', `${store.glass.tint}%`);
+  document.documentElement.classList.toggle('glass-refract', store.glass.refraction > 0);
+}
+
+export function setGlass(patch: Partial<Glass>) {
+  store.glass = clampGlass({ ...store.glass, ...patch });
+  try {
+    localStorage.setItem('calme.glass', JSON.stringify(store.glass));
+  } catch {
+    /* not persisted */
+  }
+  applyGlass();
+}
+applyGlass();

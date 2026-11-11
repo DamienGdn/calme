@@ -9,7 +9,7 @@ import MailBody from '../components/MailBody.vue';
 import UnsubBar from './UnsubBar.vue';
 
 const props = defineProps<{ mail: MailItem; busy: boolean }>();
-const emit = defineEmits<{ back: []; archive: []; trash: []; label: [id: string, name: string] }>();
+const emit = defineEmits<{ back: []; archive: []; trash: []; handled: []; label: [id: string, name: string] }>();
 const { t } = useI18n();
 
 const a = computed(() => props.mail.analysis);
@@ -50,6 +50,9 @@ function eventDate(start: string, end: string) {
         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ a ? t(`cat.${a.category}`) : t('cat.untriaged') }} · {{ when(mail.date) }}</span>
       </span>
       <div class="actions">
+        <button v-if="a?.category === 'reply'" type="button" class="btn handled" :aria-label="t('reader.handled')" :title="t('reader.handledHint')" :disabled="busy" @click="emit('handled')">
+          <Icon name="check" :size="16" /> <span class="wide-only">{{ t('reader.handled') }}</span>
+        </button>
         <button type="button" class="btn btn-icon" :aria-label="t('reader.archive')" :title="t('reader.archive')" :disabled="busy" @click="emit('archive')"><Icon name="archive" :size="18" /></button>
         <button type="button" class="btn btn-icon" :aria-label="t('reader.file')" :title="t('reader.file')" :aria-expanded="menu" :disabled="busy" @click="openMenu"><Icon name="folder" :size="18" /></button>
         <button type="button" class="btn btn-icon btn-danger" :aria-label="t('reader.trash')" aria-keyshortcuts="Enter" :title="t('reader.trashHint')" :disabled="busy" @click="emit('trash')"><Icon name="trash" :size="18" /></button>

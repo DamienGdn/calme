@@ -10,7 +10,7 @@ import { store } from '../store.ts';
  * HTML show their text with clickable links. Images load unless the user blocked them in Admin › App (some senders
  * use them to know a mail was opened); then a button shows them for this mail.
  */
-const props = defineProps<{ mailId: string; text: string | null }>();
+const props = withDefaults(defineProps<{ mailId: string; text: string | null; source?: 'inbox' | 'gmail' }>(), { source: 'inbox' });
 const { t } = useI18n();
 const html = ref<string | null | undefined>(undefined);
 const imagesByDefault = () => store.state?.remoteImages ?? true;
@@ -24,7 +24,8 @@ watch(
     html.value = undefined;
     images.value = imagesByDefault();
     try {
-      html.value = (await api<{ html: string | null }>(`/api/mail/${encodeURIComponent(id)}/html`)).html;
+      const base = props.source === 'gmail' ? '/api/gmail' : '/api/mail';
+      html.value = (await api<{ html: string | null }>(`${base}/${encodeURIComponent(id)}/html`)).html;
     } catch {
       html.value = null;
     }

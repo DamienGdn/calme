@@ -336,7 +336,20 @@ describe('api ai search', () => {
     expect(body.answer).toBe('L’AG a lieu le 3 décembre à 18h30.');
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['n1', 'n3']);
     expect(body.results[0].relevant).toBe(true);
-    expect(g.calls.find((c) => c.method === 'listInboxIds')?.args).toEqual(['from:syndic AG', 25]);
+    expect(g.calls.find((c) => c.method === 'listInboxIds')?.args).toEqual(['from:syndic AG', 30]);
+    expect(Array.isArray(body.points)).toBe(true);
+  });
+
+  it('covers a broad topic: always asks Gmail too, even when the local base already has many mails', async () => {
+    const { app, archive, g } = setup();
+    archive.add(Array.from({ length: 8 }, (_, i) => mail(`loc${i}`, { subject: `AG syndic ${i}`, fromEmail: 'gestion@syndic.fr', text: `Point ${i} sur l’AG du syndic.` })));
+    g.state.ids = ['n1', 'n3'];
+    const body = await (
+      await app.request('/api/search', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ question: 'Tout sur l’AG du syndic' }) })
+    ).json();
+    const ids = body.results.map((r: { id: string }) => r.id);
+    expect(ids.filter((id: string) => id.startsWith('loc'))).toHaveLength(8);
+    expect(ids).toEqual(expect.arrayContaining(['n1', 'n3']));
   });
 
   it('searches the local mail base first and reads full archived text', async () => {
@@ -625,5 +638,39 @@ describe('embedded images (signatures)', () => {
     await app.request('/api/mail/cid1/html', { headers: auth });
     expect(g.calls.filter((c) => c.method === 'get')).toHaveLength(1);
     expect(g.calls.filter((c) => c.method === 'attachment')).toHaveLength(1);
+  });
+});
+
+describe('formatted mail from a Gmail folder', () => {
+  it('never sends a folder mail’s raw HTML, and serves it cleaned with its embedded images', async () => {
+    const { app } = setup();
+    expect(await (await app.request('/api/gmail/html7', { headers: auth })).json()).not.toHaveProperty('html');
+    expect((await (await app.request('/api/gmail/html7/html', { headers: auth })).json()).html).toBe('<p>riche html7</p>');
+    const { html } = await (await app.request('/api/gmail/cid9/html', { headers: auth })).json();
+    expect(html).toContain('data:image/png;base64,');
+    expect(await (await app.request('/api/gmail/plain3/html', { headers: auth })).json()).toEqual({ html: null });
+  });
+});
+
+describe('mark a mail as handled', () => {
+  const put = (app: ReturnType<typeof setup>['app'], id: string, category: string) =>
+    app.request(`/api/mail/${id}/category`, { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ category }) });
+
+  it('moves a mail out of "to answer" and back (undo)', async () => {
+    const { app, store } = setup();
+    store.saveAnalyses([{ id: 'a', category: 'reply', summary: ['x'], action: 'répondre', replies: [], group: null }]);
+    expect(store.counts().reply).toBe(1);
+    expect((await put(app, 'a', 'read')).status).toBe(200);
+    expect(store.counts().reply).toBe(0);
+    expect(store.getMail('a')?.analysis?.category).toBe('read');
+    expect(store.getMail('a')?.analysis?.summary).toEqual(['x']);
+    await put(app, 'a', 'reply');
+    expect(store.counts().reply).toBe(1);
+  });
+
+  it('refuses an unknown category or mail', async () => {
+    const { app } = setup();
+    expect((await put(app, 'a', 'spam')).status).toBe(400);
+    expect((await put(app, 'zzz', 'read')).status).toBe(404);
   });
 });

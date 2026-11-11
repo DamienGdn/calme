@@ -128,6 +128,20 @@ const undoTrash = (ids: string[]) => ({
   },
 });
 
+/** Undo for "handled": the mail goes back to "to answer". */
+const undoHandled = (id: string) => ({
+  label: t('common.undo'),
+  run: async () => {
+    try {
+      await post(`/api/mail/${encodeURIComponent(id)}/category`, { category: 'reply' });
+      notify(t('triage.backToReply'));
+      await refresh();
+    } catch (e) {
+      notifyError(e);
+    }
+  },
+});
+
 async function trashSelection() {
   const ids = [...selected.value];
   if (!ids.length || busy.value) return;
@@ -171,7 +185,7 @@ async function act(mail: MailItem | null, path: string, done: string, body?: unk
   busy.value = true;
   try {
     await post(`/api/mail/${encodeURIComponent(mail.id)}/${path}`, body);
-    notify(done, false, path === 'trash' ? undoTrash([mail.id]) : undefined);
+    notify(done, false, path === 'trash' ? undoTrash([mail.id]) : path === 'category' ? undoHandled(mail.id) : undefined);
     if (tabs.value.ids.length > 1 && tabs.value.ids.includes(mail.id)) {
       updateTabs((st) => closeTab(st, mail.id));
     } else {
@@ -309,7 +323,6 @@ function askCalme() {
           role="tab"
           :aria-selected="filter === k"
           :class="['seg', CAT_CLASS[k], { dim: filter !== 'all' && filter !== k }]"
-          :style="{ flex: `${Math.max(counts[k], 1)} 1 120px` }"
           @click="setFilter(filter === k ? 'all' : k)"
         >
           <span class="n">{{ counts[k] }}</span>
@@ -376,6 +389,7 @@ function askCalme() {
           @back="closeReading"
           @archive="act(current, 'archive', t('triage.archived'))"
           @trash="trash(current)"
+          @handled="act(current, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(current, 'label', t('triage.filed', { name }), { labelId: id })"
         />
         <Reader
@@ -386,6 +400,7 @@ function askCalme() {
           @back="closeReading"
           @archive="act(second, 'archive', t('triage.archived'))"
           @trash="trash(second)"
+          @handled="act(second, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(second, 'label', t('triage.filed', { name }), { labelId: id })"
         />
       </div>

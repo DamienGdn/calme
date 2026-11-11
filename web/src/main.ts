@@ -12,4 +12,7 @@ if (pair) {
   setToken(pair[1]);
   history.replaceState(null, '', '/#/tri');
 } else linkManifest();
+// The app does not zoom like a web page: iOS ignores user-scalable=no, so pinch gestures are stopped here
+// (double-tap zoom is off through touch-action, focus zoom through 16px fields; see styles.css).
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
 createApp(App).use(i18n).mount('#root');

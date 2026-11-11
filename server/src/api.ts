@@ -19,7 +19,7 @@ import { searchMail } from './search.ts';
 import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts';
 import type { Archive } from './archive.ts';
 import { composeMail } from './triage.ts';
-import type { PushSub } from './types.ts';
+import { CATEGORIES, type Category, type PushSub } from './types.ts';
 
 export interface Deps {
   store: Store;
@@ -299,7 +299,20 @@ export function createApp(d: Deps) {
     return c.json(items);
   });
 
-  app.get('/api/gmail/:id', async (c) => c.json(parseGmailMessage(await gmail().get(c.req.param('id')))));
+  app.get('/api/gmail/:id', async (c) => {
+    const { html: _html, ...m } = parseGmailMessage(await gmail().get(c.req.param('id')));
+    return c.json(m);
+  });
+
+  // A folder mail's formatted version (not stored: read from Gmail), cleaned, with its embedded images.
+  app.get('/api/gmail/:id/html', async (c) => {
+    const id = c.req.param('id');
+    const g = gmail();
+    const msg = await g.get(id);
+    let html = parseGmailMessage(msg).html ?? '';
+    if (/\bcid:/i.test(html)) html = await embedImages(g, id, html, msg);
+    return c.json({ html: html ? safeMailHtml(html) : null });
+  });
 
   app.get('/api/mail/:id', (c) => {
     const m = store.getMail(c.req.param('id'));
@@ -341,6 +354,16 @@ export function createApp(d: Deps) {
 
   app.post('/api/mail/:id/trash', async (c) => {
     await trash(gmail(), store, c.req.param('id'));
+    return c.json({ ok: true });
+  });
+
+  // "Handled": a mail leaves "to answer" without a reply from Calme (and comes back with Undo).
+  app.post('/api/mail/:id/category', async (c) => {
+    const { category } = await c.req.json<{ category?: unknown }>();
+    if (!CATEGORIES.includes(category as Category)) return c.json({ error: 'Unknown category' }, 400);
+    const id = c.req.param('id');
+    if (!store.getMail(id)?.analysis) return c.json({ error: 'Mail introuvable' }, 404);
+    store.setCategory(id, category as Category);
     return c.json({ ok: true });
   });
 

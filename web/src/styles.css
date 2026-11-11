@@ -105,7 +105,7 @@ button { cursor: pointer; }
   .rail { display: none; }
   .main { padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 110px); gap: 20px; }
   .tabbar {
-    display: flex; position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 10px); z-index: 20;
+    display: flex; position: fixed; left: 12px; right: 12px; bottom: var(--bar-bottom); z-index: 20;
     padding: 6px; border-radius: 22px; background: var(--surf); border: 1px solid var(--line); box-shadow: var(--shadow);
   }
   .tabbar a { flex: 1; height: 52px; border-radius: 16px; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-decoration: none; font-size: 11px; font-weight: 500; position: relative; }
@@ -132,11 +132,12 @@ button { cursor: pointer; }
 .banner p { flex: 1 1 280px; margin: 0; }
 
 /* Segmented sort bar */
-.segs { display: flex; flex-wrap: wrap; gap: 4px; }
+.segs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.seg[aria-selected='true'] { outline: 2px solid var(--ink); outline-offset: -5px; }
+.seg:focus-visible { outline-offset: -5px; }
 .seg { min-height: 64px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 6px; padding: 10px 14px; border-radius: 12px; border: 0; text-align: left; transition: opacity 0.2s; }
 .seg .n { font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1; }
 .seg .l { font-size: 12px; font-weight: 600; }
-.seg[aria-selected='true'] { outline: 2px solid var(--ink); outline-offset: 3px; }
 .seg.dim { opacity: 0.45; }
 .c-reply { background: var(--hot); color: #0d0e11; }
 .c-read { background: var(--read); color: var(--read-fg); }
@@ -245,7 +246,7 @@ button { cursor: pointer; }
 .nl .name { font-family: 'Instrument Serif', Georgia, serif; font-size: 21px; line-height: 1.1; }
 .pill { justify-self: start; font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px; background: var(--surf2); }
 .sticky-foot { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px clamp(16px, 3vw, 44px); margin: 0 calc(-1 * clamp(16px, 3vw, 44px)) -40px; background: var(--bg2); border-top: 1px solid var(--line); }
-@media (max-width: 720px) { .sticky-foot { bottom: calc(env(safe-area-inset-bottom) + 84px); margin: 0 -16px; border-radius: 16px; } }
+@media (max-width: 720px) { .sticky-foot { bottom: calc(var(--bar-bottom) + 74px); margin: 0 -16px; border-radius: 16px; } }
 
 /* Pairing */
 .pairing { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
@@ -254,7 +255,7 @@ button { cursor: pointer; }
 /* Toast */
 .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px); transform: translateX(-50%); z-index: 50; padding: 12px 18px; border-radius: 12px; background: var(--prim-bg); color: var(--prim-fg); font-size: 14px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
 .toast.err { background: var(--danger); color: #0d0e11; }
-@media (max-width: 720px) { .toast { bottom: calc(env(safe-area-inset-bottom) + 96px); } }
+@media (max-width: 720px) { .toast { bottom: calc(var(--bar-bottom) + 86px); } }
 
 .mobile-only { display: none; }
 @media (max-width: 720px) { .mobile-only { display: inline-flex; } }
@@ -494,7 +495,7 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
   .wide-only { display: none; }
   .fab {
     display: inline-flex; align-items: center; gap: 8px; position: fixed; right: 16px; z-index: 21;
-    bottom: calc(env(safe-area-inset-bottom) + 88px); min-height: 52px; padding: 0 20px 0 18px;
+    bottom: calc(var(--bar-bottom) + 78px); min-height: 52px; padding: 0 20px 0 18px;
     border: 0; border-radius: 999px; background: var(--prim-bg); color: var(--prim-fg); font-size: 15px; font-weight: 600;
     box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.7);
   }
@@ -548,7 +549,7 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .swipe-fg.moving { background: var(--bg); border-radius: 16px; }
 @media (max-width: 720px) {
   .reading-pane { touch-action: pan-y; }
-  .selbar { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(env(safe-area-inset-bottom) + 84px); z-index: 22; }
+  .selbar { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(var(--bar-bottom) + 74px); z-index: 22; }
   .main:has(.selbar) ~ .fab { display: none; }
 }
 
@@ -580,25 +581,149 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
   body::after { content: ''; position: fixed; inset: 0 0 auto 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 40; pointer-events: none; }
 }
 
-/* Phone menu bar in "liquid glass": translucent, blurs what scrolls behind it, light rim and a top sheen. */
+
+/* ---------- Diary ("carnet"): the agenda reads like a paper diary — the day's big numeral in the margin. ---------- */
+.tl-date { display: flex; flex-direction: column; gap: 2px; }
+.tl-n { font-family: 'Instrument Serif', Georgia, serif; font-size: 44px; line-height: 0.9; letter-spacing: -0.02em; }
+.tl-wd { font-size: 14px; text-transform: capitalize; color: var(--body); }
+.tl-day.today .tl-n { color: var(--accent-text); }
+.tl-evs { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tl-time { display: inline-flex; gap: 0; font-size: 13px; }
+.tl-t2::before { content: '–'; }
+.tl-free { margin: 0; padding: 10px 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 18px; color: var(--muted); }
+.month-cell { border: 0; text-align: left; color: inherit; font: inherit; cursor: default; }
+.month-dots { display: none; }
+.cal-title { margin: 0; font-size: 30px; font-weight: 400; text-transform: capitalize; }
+.phone-only { display: none; }
+
+/* ---------- Table of contents (folders, phone) ---------- */
+.toc { display: none; }
+.folder-head { display: flex; flex-direction: column; gap: 6px; }
+.back-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; padding: 6px 0; border: 0; background: none; color: var(--accent-text); font-size: 15px; font-weight: 500; }
+.folder-title { margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 44px; line-height: 1; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+
 @media (max-width: 720px) {
-  .tabbar {
-    border-radius: 28px;
-    background: color-mix(in srgb, var(--surf) 52%, transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-    backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 18px 44px -16px rgba(0, 0, 0, 0.65);
-  }
-  .tabbar::before {
-    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 46%);
-  }
-  .tabbar a[aria-current='page'] { border-radius: 22px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 16px -8px rgba(0, 0, 0, 0.5); }
-  [data-theme='light'] .tabbar {
-    background: color-mix(in srgb, #ffffff 46%, transparent);
-    border-color: rgba(255, 255, 255, 0.75);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.06), 0 18px 40px -18px rgba(0, 0, 0, 0.28);
-  }
-  [data-theme='light'] .tabbar::before { background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 50%); }
+  .phone-only { display: inline; }
+  .topbar .btn-prim .phone-only { font-size: 20px; line-height: 1; }
+
+  /* Agenda: one swipeable row of days. */
+  .strip { display: flex; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px; }
+  .strip::-webkit-scrollbar { display: none; }
+  .strip-day { flex: 0 0 52px; scroll-snap-align: start; padding: 10px 0 8px; border-radius: 16px; }
+  .strip-day.today { background: var(--prim-bg); color: var(--prim-fg); border-color: transparent; }
+  .proposal { padding: 16px; gap: 8px; border-left-width: 3px; border-left-color: var(--accent); }
+  .proposal .serif { font-size: 24px !important; }
+
+  /* Diary: date in a sticky margin, events on ruled lines. */
+  .timeline { padding: 0; background: transparent; border: 0; border-radius: 0; }
+  .tl-day { grid-template-columns: 62px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .tl-date { position: sticky; top: calc(env(safe-area-inset-top) + 8px); }
+  .tl-n { font-size: 40px; }
+  .tl-wd { font-size: 12px; }
+  .tl-date .eyebrow { font-size: 10px; }
+  .tl-ev { grid-template-columns: 50px minmax(0, 1fr); gap: 10px; padding: 10px 12px; border-radius: 12px; border: 0; border-left: 3px solid var(--line); background: var(--surf); }
+  .tl-ev .tag { display: none; }
+  .tl-ev.prop { border-left-style: dashed; border-left-color: var(--accent); background: var(--surf2); }
+  .tl-ev.conflict { border-left-color: var(--hot); border-left-style: solid; }
+  .tl-time { flex-direction: column; font-size: 12px; line-height: 1.35; }
+  .tl-t2::before { content: none; }
+  .tl-t2 { opacity: 0.7; }
+
+  /* Calendar views. */
+  .cal-head { gap: 6px; }
+  .cal-head h2 { order: -1; flex: 1 1 100%; margin: 0 0 4px; }
+  .cal-title { font-size: 28px; }
+  .cal-legend { gap: 12px; font-size: 11px; }
+  .month { border-radius: 16px; }
+  .month-wd { padding: 6px 0; text-align: center; font-size: 10px; }
+  .month-cell { min-height: 0; aspect-ratio: 1 / 1; padding: 6px 0 4px; align-items: center; justify-content: space-between; gap: 2px; cursor: pointer; }
+  .month-cell .chip-ev, .month-cell .more { display: none; }
+  .month-n { font-size: 19px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; }
+  .month-cell.today .month-n { width: 30px; height: 30px; }
+  .month-cell.sel { background: var(--surf2); }
+  .month-cell.sel .month-n { box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .month-cell.today.sel .month-n { box-shadow: none; }
+  .month-dots { display: flex; gap: 3px; height: 5px; }
+  .month-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); }
+  .month-dots i.proposed { background: var(--accent); }
+  .month-dots i.conflict { background: var(--hot); }
+
+  /* Folders: chips give way to the table of contents. */
+  .folders { display: none; }
+  .toc { display: flex; flex-direction: column; margin: 0 -4px; }
+  .toc-row { display: flex; align-items: baseline; gap: 10px; min-height: 52px; padding: 12px 4px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; }
+  .toc-row.d0 .toc-name { font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; line-height: 1.05; }
+  .toc-row.d1, .toc-row.d2 { padding-left: 22px; min-height: 46px; border-bottom-style: dashed; }
+  .toc-row.d2 { padding-left: 40px; }
+  .toc-row.d1 .toc-name, .toc-row.d2 .toc-name { font-size: 16px; color: var(--body); }
+  .toc-row.d1 .toc-name::before, .toc-row.d2 .toc-name::before { content: '↳ '; color: var(--muted); }
+  .toc-lead { flex: 1; align-self: center; height: 0; border-bottom: 1px dotted color-mix(in srgb, var(--muted) 55%, transparent); transform: translateY(4px); }
+  .toc-go { color: var(--muted); align-self: center; display: flex; }
+  .toc-row:active { background: var(--surf2); }
 }
+
+/* ---------- Phone menu bar in liquid glass ----------
+   Layers: the bar itself is transparent; ::before carries the blurred backdrop and is bent at the rim by the SVG
+   refraction filter (#calme-glass, a lens-shaped displacement map); ::after adds the tint, the sheen and the light
+   rim. Strength, blur and tint are per-device settings (Admin › App). The bar sits low, just above the home bar. */
+:root { --bar-bottom: 10px; --glass-blur: 6px; --glass-tint: 42%; }
+.glass-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+@media (max-width: 720px) {
+  :root { --bar-bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); }
+  .tabbar { background: transparent; border: 0; border-radius: 30px; isolation: isolate; box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.55); }
+  .tabbar::before, .tabbar::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; }
+  .tabbar::before {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(185%) brightness(1.06);
+    backdrop-filter: blur(var(--glass-blur)) saturate(185%) brightness(1.06);
+  }
+  .glass-refract .tabbar::before { filter: url(#calme-glass); }
+  .tabbar::after {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 42%),
+      color-mix(in srgb, var(--surf) var(--glass-tint), transparent);
+    box-shadow:
+      inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.5),
+      inset -1px -1.5px 1px rgba(255, 255, 255, 0.14),
+      inset 0 0 22px rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+  .tabbar a[aria-current='page'] { border-radius: 24px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 16px -8px rgba(0, 0, 0, 0.5); }
+  [data-theme='light'] .tabbar { box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.3); }
+  [data-theme='light'] .tabbar::after {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 48%),
+      color-mix(in srgb, #ffffff var(--glass-tint), transparent);
+    box-shadow: inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.95), inset -1px -1.5px 1px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  }
+}
+.cal-title { text-transform: none; }
+.cal-title::first-letter { text-transform: uppercase; }
+
+/* Glass settings (Admin › App). */
+.glass-set { display: flex; flex-direction: column; gap: 8px; }
+.range { display: grid; grid-template-columns: 88px minmax(0, 1fr) 52px; align-items: center; gap: 10px; font-size: 14px; }
+.range input { width: 100%; accent-color: var(--accent); }
+.range output { font-size: 12px; color: var(--muted); text-align: right; }
+
+/* No page zoom in the app: double-tap zoom off; on the phone, fields at 16px so iOS does not zoom in on focus. */
+html { touch-action: manipulation; }
+@media (max-width: 720px) {
+  input, select, textarea { font-size: 16px !important; }
+  .tabbar a:not([aria-current='page']) { text-shadow: 0 1px 6px color-mix(in srgb, var(--bg) 85%, transparent); color: var(--ink); }
+}
+
+/* Search answer: readable text, and a timeline when the topic spans several mails. */
+.answer { margin: 0; font-size: 16px; line-height: 1.65; color: var(--ink); max-width: 68ch; }
+.points { margin: 2px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+.points li { position: relative; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; padding: 7px 0 7px 16px; font-size: 14px; line-height: 1.5; color: var(--body); }
+.points li::before { content: ''; position: absolute; left: -4px; top: 14px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.points .mono { font-size: 12px; color: var(--muted); padding-top: 1px; }
+@media (max-width: 720px) {
+  .ask-big { flex-wrap: wrap; }
+  .ask-big input { font-size: 22px !important; }
+  .points li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
+
+/* "Handled" (to-answer mails): a clear, quiet action next to archive / folder / trash. */
+.actions .handled { min-height: 44px; padding: 0 14px; border-color: var(--sel-border); color: var(--accent-text); font-weight: 600; }
+@media (max-width: 720px) { .reader-top .handled { width: 40px; min-height: 40px; padding: 0; } }

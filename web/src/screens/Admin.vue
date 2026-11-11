@@ -8,10 +8,15 @@ import IphoneCard from '../components/IphoneCard.vue';
 import NotificationsCard from '../components/NotificationsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
-import { notify, notifyError, refresh, setThemePref, store, type ThemePref } from '../store.ts';
+import { GLASS_DEFAULT, notify, notifyError, refresh, setGlass, setThemePref, store, type Glass, type ThemePref } from '../store.ts';
 
 const version = __APP_VERSION__;
 const THEMES: ThemePref[] = ['system', 'light', 'dark'];
+const GLASS_KNOBS: { key: keyof Glass; max: number; unit: string }[] = [
+  { key: 'refraction', max: 80, unit: '' },
+  { key: 'blur', max: 24, unit: ' px' },
+  { key: 'tint', max: 90, unit: ' %' },
+];
 
 interface Settings {
   autoUnsubscribe: boolean;
@@ -171,6 +176,15 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
             <button v-for="th in THEMES" :key="th" type="button" role="radio" :aria-checked="store.themePref === th" @click="setThemePref(th)">{{ t(`admin.themes.${th}`) }}</button>
           </div>
           <span class="muted" style="font-size: 12px">{{ t('admin.themeNote') }}</span>
+        </div>
+        <div class="glass-set">
+          <span class="eyebrow">{{ t('admin.glass') }}</span>
+          <label v-for="k in GLASS_KNOBS" :key="k.key" class="range">
+            <span>{{ t(`admin.glassKnobs.${k.key}`) }}</span>
+            <input type="range" min="0" :max="k.max" :value="store.glass[k.key]" @input="setGlass({ [k.key]: Number(($event.target as HTMLInputElement).value) })" />
+            <output class="mono">{{ store.glass[k.key] }}{{ k.unit }}</output>
+          </label>
+          <span class="muted" style="font-size: 12px">{{ t('admin.glassNote') }} <button type="button" class="linkish" style="display: inline; padding: 0" @click="setGlass(GLASS_DEFAULT)">{{ t('admin.glassReset') }}</button></span>
         </div>
         <label class="switch">
           <input type="checkbox" :checked="v.settings.remoteImages" @change="save({ remoteImages: ($event.target as HTMLInputElement).checked })" />

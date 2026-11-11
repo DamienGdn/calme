@@ -3,6 +3,7 @@ import { computed, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { post, useMailBody, when } from '../api.ts';
 import Icon from '../components/Icon.vue';
+import MailBody from '../components/MailBody.vue';
 import { goTo, notifyError } from '../store.ts';
 
 interface Result {
@@ -19,6 +20,8 @@ interface SearchResponse {
   query: string;
   explanation: string;
   answer: string;
+  /** Short timeline "date — fact" when several mails matter. */
+  points?: string[];
   results: Result[];
 }
 
@@ -33,6 +36,15 @@ const body = useMailBody(
   toRef(() => (open.value?.source === 'local' ? 'archive' : 'gmail')),
 );
 const examples = computed(() => tm('search.examples') as unknown as string[]);
+/** "3 nov. — Permis accordé" → date and fact, so the timeline can line the dates up. */
+const point = (p: string) => {
+  const m = /^(.{2,24}?)\s+[—–-]\s+(.+)$/.exec(p);
+  return m ? { date: m[1], text: m[2] } : { date: '', text: p };
+};
+function read(r: Result) {
+  open.value = r;
+  if (window.matchMedia('(max-width: 720px)').matches) window.scrollTo({ top: 0 });
+}
 
 async function run(q: string) {
   if (!q.trim()) return;
@@ -81,13 +93,16 @@ function submit() {
   <template v-if="res">
     <section class="claude-box" :aria-label="t('search.answer')">
       <span class="eyebrow" style="display: flex; align-items: center; gap: 8px"><span class="dot" /> {{ t('search.answer') }}</span>
-      <p class="serif" style="margin: 0; font-size: 24px; line-height: 1.3">{{ res.answer }}</p>
+      <p class="answer">{{ res.answer }}</p>
+      <ol v-if="res.points?.length" class="points">
+        <li v-for="(p, i) in res.points" :key="i"><span class="mono">{{ point(p).date }}</span><span>{{ point(p).text }}</span></li>
+      </ol>
       <span class="mono muted" style="font-size: 12px">{{ t('search.query', { q: res.query, n: t('common.mails', res.results.length) }) }}</span>
     </section>
 
     <div :class="['split', { reading: open }]">
       <section class="list" :aria-label="t('search.found')">
-        <button v-for="r in res.results" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="open = r">
+        <button v-for="r in res.results" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="read(r)">
           <span class="mark" :style="{ background: r.relevant ? 'var(--accent)' : 'var(--line)' }" aria-hidden="true" />
           <span class="from">{{ r.fromName }}</span>
           <span class="time">{{ when(r.date) }}</span>
@@ -98,15 +113,21 @@ function submit() {
           </span>
         </button>
       </section>
-      <article v-if="open" class="reader rise" :aria-label="t('reader.label')">
-        <button type="button" class="btn back" style="align-self: flex-start" @click="open = null"><Icon name="back" :size="16" /> {{ t('common.back') }}</button>
-        <div style="display: flex; flex-direction: column; gap: 10px">
-          <span class="eyebrow">{{ when(open.date) }}</span>
-          <h2>{{ open.subject || t('common.noSubject') }}</h2>
-          <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">{{ open.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ open.fromEmail }}&gt;</span></span>
+      <div v-if="open" class="reading-pane">
+        <div class="readers">
+          <article class="reader rise" :aria-label="t('reader.label')">
+            <div class="reader-top">
+              <button type="button" class="btn back" @click="open = null"><Icon name="back" :size="16" /> {{ t('common.back') }}</button>
+              <span class="eyebrow" style="font-size: 12px">{{ when(open.date) }}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+              <h2>{{ open.subject || t('common.noSubject') }}</h2>
+              <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">{{ open.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ open.fromEmail }}&gt;</span></span>
+            </div>
+            <MailBody :mail-id="open.id" :text="body ?? open.snippet" source="gmail" />
+          </article>
         </div>
-        <div class="mail-body">{{ body ?? open.snippet }}</div>
-      </article>
+      </div>
     </div>
   </template>
 </template>
