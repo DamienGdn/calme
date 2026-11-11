@@ -109,6 +109,16 @@ const fr = {
     unsubDone: 'Désabonné de {name}',
     unsubConfirm: 'Confirme le désabonnement sur la page qui vient de s’ouvrir',
   },
+  tabs: {
+    bar: 'Mails ouverts',
+    close: 'Fermer {name}',
+    compare: 'Comparer',
+    stopCompare: 'Fin de la comparaison',
+    compareHint: 'Deux mails côte à côte (touche C)',
+    keys: '← → changer de mail · X fermer · C comparer',
+    rowHint: '⌘-clic ou appui long : garder ouvert dans un onglet',
+    added: 'Gardé dans les mails ouverts',
+  },
   editor: {
     reply: 'Réponse',
     newMessage: 'Nouveau message',
@@ -558,6 +568,16 @@ const en: Messages = {
     unsubscribed: 'Unsubscribed',
     unsubDone: 'Unsubscribed from {name}',
     unsubConfirm: 'Confirm the unsubscription on the page that just opened',
+  },
+  tabs: {
+    bar: 'Open mails',
+    close: 'Close {name}',
+    compare: 'Compare',
+    stopCompare: 'Stop comparing',
+    compareHint: 'Two mails side by side (C key)',
+    keys: '← → switch mail · X close · C compare',
+    rowHint: '⌘-click or long press: keep open in a tab',
+    added: 'Kept in open mails',
   },
   editor: {
     reply: 'Reply',

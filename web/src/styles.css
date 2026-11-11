@@ -155,7 +155,32 @@ button { cursor: pointer; }
 .row .one { grid-column: 2 / 4; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .empty { padding: 40px 0; font-family: 'Instrument Serif', Georgia, serif; font-style: italic; font-size: 28px; color: var(--muted); }
 
-.reader { flex: 3 1 460px; min-width: 0; padding: clamp(20px, 2.4vw, 36px); border-radius: 24px; background: var(--surf); border: 1px solid var(--line); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 24px; position: sticky; top: 20px; }
+.reading-pane { flex: 3 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.readers { display: flex; gap: 16px; align-items: flex-start; min-width: 0; }
+.reader { flex: 1 1 0; min-width: 0; padding: clamp(20px, 2.4vw, 36px); border-radius: 24px; background: var(--surf); border: 1px solid var(--line); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 24px; position: relative; }
+.split.comparing .list { display: none; }
+.split.comparing .reader { padding: clamp(18px, 1.8vw, 28px); }
+.split.comparing .reader + .reader { border-style: dashed; border-color: var(--accent); }
+.row.open:not([aria-current='true']) { border-color: var(--line); }
+.row { -webkit-touch-callout: none; }
+
+/* Reading tabs */
+.open-tabs { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tabs-scroll { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 1px; }
+.tabs-scroll::-webkit-scrollbar { display: none; }
+.tab { flex: 0 1 220px; min-width: 120px; display: flex; align-items: center; border-radius: 12px; border: 1px solid var(--line); }
+.tab.on { background: var(--surf); border-color: var(--sel-border); }
+.tab.cmp { border-style: dashed; border-color: var(--accent); }
+.tab-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 2px 0 12px; border: 0; border-radius: 12px 0 0 12px; background: transparent; color: var(--muted); font-size: 13px; text-align: left; }
+.tab.on .tab-main { color: var(--ink); }
+.tab-main .mark { flex: none; width: 8px; height: 8px; border-radius: 2px; }
+.tab-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-name b { font-weight: 600; color: var(--ink); }
+.tab-n { flex: none; padding: 1px 6px; border-radius: 6px; background: var(--prim-bg); color: var(--prim-fg); font-size: 10px; }
+.tab-x { flex: none; width: 32px; min-height: 40px; border: 0; border-radius: 0 12px 12px 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; }
+.tab-x:hover { color: var(--danger); }
+.compare-btn { flex: none; min-height: 40px; }
+.compare-btn[aria-pressed='true'] { background: var(--prim-bg); color: var(--prim-fg); border-color: transparent; }
 .reader h2 { margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(30px, 3vw, 42px); line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
 .reader .back { display: none; }
 .claude-box { display: grid; gap: 12px; padding: 20px 22px; border-radius: 18px; background: var(--surf2); }
@@ -178,7 +203,7 @@ button { cursor: pointer; }
 
 @media (max-width: 720px) {
   .split.reading .list { display: none; }
-  .split:not(.reading) .reader { display: none; }
+  .split:not(.reading) .reading-pane { display: none; }
   .reader { position: static; padding: 20px; border-radius: 20px; }
   .reader .back { display: inline-flex; }
 }
@@ -337,9 +362,10 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 
 /* Independent scroll: on desktop the list and the open mail each scroll on their own. */
 @media (min-width: 721px) {
-  .split .list, .split .reader { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
-  .split .list { padding-right: 4px; scrollbar-width: thin; }
-  .split .reader { scrollbar-width: thin; }
+  .split .list { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; scrollbar-width: thin; }
+  .split .reading-pane { position: sticky; top: 16px; }
+  .split .reader { max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .split .reading-pane.has-tabs .reader { max-height: calc(100vh - 32px - 54px); }
 }
 
 /* Calendar views */

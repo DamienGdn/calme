@@ -8,7 +8,7 @@
   "scripts": {
     "start": "pnpm -C server start",
     "calme": "pnpm -s -C server cli",
-    "test": "pnpm -C server test",
+    "test": "pnpm -C server test && pnpm -C web test",
     "build": "pnpm -C web build"
   },
   "pnpm": {

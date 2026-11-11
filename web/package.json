@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "icons": "node scripts/icons.mjs"
+    "icons": "node scripts/icons.mjs",
+    "test": "node --test \"test/*.test.ts\""
   },
   "devDependencies": {
     "@types/qrcode": "~1.5.6",
