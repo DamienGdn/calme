@@ -4,6 +4,8 @@ import { execFile } from 'node:child_process';
 import { cliRunner, type ClaudeRunner } from './claude.ts';
 import { autoUnsubscribe } from './newsletters.ts';
 import { openArchive } from './archive.ts';
+import { applyStagedRestore, backupNow, defaultBackupDir, pruneBackups } from './backup.ts';
+import { createRemote } from './remote.ts';
 import { syncArchive } from './archiveSync.ts';
 import { getSettings } from './settings.ts';
 import { withLanguage } from './language.ts';
@@ -18,7 +20,11 @@ import { CATEGORIES, CATEGORY_LABELS } from './types.ts';
 /** Wires config, storage, Gmail and Claude together; shared by the server and the CLI. */
 export function createRuntime() {
   const cfg = loadConfig();
-  const store = openStore(join(cfg.home, 'calme.db'));
+  const dbPath = join(cfg.home, 'calme.db');
+  if (applyStagedRestore(dbPath)) console.log('[backup] base restaurée');
+  const store = openStore(dbPath);
+  const backup = { dir: defaultBackupDir(cfg.home), dbPath };
+  const remote = createRemote(cfg.port);
   const baseOAuth = createOAuth(cfg.home);
   const settings = () => getSettings(store, { model: cfg.model, intervalMin: cfg.intervalMin });
   // Model read at call time so a change in the admin page applies without restart.
@@ -84,6 +90,16 @@ export function createRuntime() {
       await notifier.notifyReplies(analysed);
       const unsub = await autoUnsubscribe(g, store, analysed, await g.profileEmail());
       if (unsub.length) log(`[auto] désabonné de : ${unsub.join(', ')}`);
+      // Daily backup of the whole database.
+      if (Date.now() - Number(store.getMeta('lastBackup') ?? 0) > 86_400_000) {
+        try {
+          backupNow(store, backup.dir);
+          pruneBackups(backup.dir, 7);
+          store.setMeta('lastBackup', String(Date.now()));
+        } catch (e) {
+          log(`[backup] échec : ${(e as Error).message}`);
+        }
+      }
       // Local mail base: 60 full mails per cycle at most (3,600 quota units), so it never starves the rest.
       try {
         const arch = await syncArchive(g, store, archive, { months: settings().archiveMonths, batch: 60 });
@@ -134,5 +150,5 @@ export function createRuntime() {
     return CATEGORIES.map((k) => `${CATEGORY_LABELS[k]} ${c[k]}`).join(' · ');
   };
 
-  return { cfg, store, archive, oauth, runner, notifier, gmail, calendar, agenda, settings, claudeInfo, claudeTest, runCycle, status: () => ({ running, error }), summary };
+  return { cfg, store, archive, backup, remote, oauth, runner, notifier, gmail, calendar, agenda, settings, claudeInfo, claudeTest, runCycle, status: () => ({ running, error }), summary };
 }

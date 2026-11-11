@@ -46,6 +46,48 @@ describe('notifier', () => {
     expect(JSON.parse(sent[0]).title).toBe('4 mails are waiting for your answer');
   });
 
+  it('follows the push mode and skips trash mails', async () => {
+    const s = openStore(':memory:');
+    s.upsertMessages([mail('a', { subject: 'A' }), mail('b', { subject: 'B' }), mail('c', { subject: 'C' })]);
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    const sent: string[] = [];
+    const n = createNotifier(s, vapid, async (_s, p) => {
+      sent.push(JSON.parse(p).body);
+    });
+    const list: Analysis[] = [reply('a'), { ...reply('b'), category: 'read' }, { ...reply('c'), category: 'trash' }];
+    s.setMeta('settings', JSON.stringify({ pushMode: 'all' }));
+    await n.notifyReplies(list);
+    expect(sent).toEqual(['A', 'B']);
+    sent.length = 0;
+    s.setMeta('settings', JSON.stringify({ pushMode: 'off' }));
+    await n.notifyReplies(list);
+    expect(sent).toEqual([]);
+  });
+
+  it('stays silent during quiet hours', async () => {
+    const s = openStore(':memory:');
+    s.upsertMessages([mail('a')]);
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    s.setMeta('settings', JSON.stringify({ quietStart: 22, quietEnd: 7 }));
+    const sent: string[] = [];
+    const n = createNotifier(s, vapid, async (_s, p) => {
+      sent.push(p);
+    }, () => new Date(2026, 10, 11, 23, 30));
+    await n.notifyReplies([reply('a')]);
+    expect(sent).toEqual([]);
+  });
+
+  it('sends a test push to one device', async () => {
+    const s = openStore(':memory:');
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    const sent: string[] = [];
+    const ok = await createNotifier(s, vapid, async (sub, p) => {
+      sent.push(sub.endpoint + ' ' + JSON.parse(p).title);
+    }).test('https://push/1');
+    expect(ok).toBe(true);
+    expect(sent[0]).toMatch(/^https:\/\/push\/1 /);
+  });
+
   it('drops expired subscriptions', async () => {
     const s = openStore(':memory:');
     s.upsertMessages([mail('a')]);

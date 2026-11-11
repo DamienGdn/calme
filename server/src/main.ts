@@ -10,6 +10,10 @@ const rt = createRuntime();
 const app = createApp({
   store: rt.store,
   archive: rt.archive,
+  backup: rt.backup,
+  remote: rt.remote,
+  // The desktop app relaunches the server when it exits; from a terminal, start it again by hand.
+  restart: () => setTimeout(() => process.exit(0), 300),
   gmail: rt.gmail,
   oauth: rt.oauth,
   runner: rt.runner,

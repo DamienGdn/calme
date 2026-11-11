@@ -7,6 +7,9 @@ export type Model = (typeof MODELS)[number];
 export const LANGUAGES = ['fr', 'en'] as const;
 export type Language = (typeof LANGUAGES)[number];
 
+export const PUSH_MODES = ['all', 'reply', 'off'] as const;
+export type PushMode = (typeof PUSH_MODES)[number];
+
 export const ARCHIVE_MONTHS = [0, 1, 3, 6, 12, 24, 36];
 
 export interface Settings {
@@ -14,6 +17,9 @@ export interface Settings {
   keepSenders: string[];
   archiveMonths: number;
   language: Language;
+  pushMode: PushMode;
+  quietStart: number | null;
+  quietEnd: number | null;
   model: string;
   intervalMin: number;
 }
@@ -21,7 +27,7 @@ export interface Settings {
 /** User-editable settings (admin page), stored in the database; env/config values are the defaults. */
 export function getSettings(s: Store, defaults: { model: string; intervalMin: number }): Settings {
   const saved = JSON.parse(s.getMeta('settings') ?? '{}') as Partial<Settings>;
-  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', ...defaults, ...saved };
+  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, ...defaults, ...saved };
 }
 
 export function saveSettings(s: Store, patch: Partial<Settings>): void {
@@ -42,6 +48,16 @@ export function saveSettings(s: Store, patch: Partial<Settings>): void {
   if (patch.language !== undefined) {
     if (!LANGUAGES.includes(patch.language)) throw new Error(`Unknown language: ${patch.language}`);
     next.language = patch.language;
+  }
+  if (patch.pushMode !== undefined) {
+    if (!PUSH_MODES.includes(patch.pushMode)) throw new Error(`Unknown push mode: ${patch.pushMode}`);
+    next.pushMode = patch.pushMode;
+  }
+  for (const k of ['quietStart', 'quietEnd'] as const) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    if (v !== null && (!Number.isInteger(v) || v < 0 || v > 23)) throw new Error('Quiet hours are 0–23');
+    next[k] = v;
   }
   if (patch.autoUnsubscribe !== undefined) next.autoUnsubscribe = Boolean(patch.autoUnsubscribe);
   if (patch.keepSenders !== undefined) {

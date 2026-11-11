@@ -59,4 +59,6 @@ export type MailView = MailMessage & { analysis: Analysis | null };
 export interface PushSub {
   endpoint: string;
   keys: { p256dh: string; auth: string };
+  name?: string;
+  addedAt?: number;
 }

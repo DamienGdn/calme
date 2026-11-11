@@ -102,7 +102,7 @@ const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ?
 
   <div v-if="view && !view.connected" class="banner">
     <p>{{ t('agenda.notConnected') }}</p>
-    <a class="btn btn-prim" href="/auth/google">{{ t('agenda.connect') }}</a>
+    <a class="btn btn-prim" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.connect') }}</a>
   </div>
 
   <NewEvent v-if="form" @done="form = false; load()" />

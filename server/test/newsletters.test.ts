@@ -28,7 +28,7 @@ describe('scanNewsletters', () => {
 describe('settings', () => {
   it('defaults to no automatic unsubscribe', () => {
     const s = openStore(':memory:');
-    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 })).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', model: 'sonnet', intervalMin: 5 });
+    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 })).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, model: 'sonnet', intervalMin: 5 });
   });
   it('rejects invalid values', () => {
     const s = openStore(':memory:');
@@ -36,6 +36,8 @@ describe('settings', () => {
     expect(() => saveSettings(s, { intervalMin: 0 })).toThrow();
     expect(() => saveSettings(s, { archiveMonths: 5 })).toThrow();
     expect(() => saveSettings(s, { language: 'de' as never })).toThrow();
+    expect(() => saveSettings(s, { pushMode: 'loud' as never })).toThrow();
+    expect(() => saveSettings(s, { quietStart: 25 })).toThrow();
     saveSettings(s, { archiveMonths: 24 });
     expect(getSettings(s, { model: 'sonnet', intervalMin: 5 }).archiveMonths).toBe(24);
     saveSettings(s, { keepSenders: ['  News@X.fr '] });

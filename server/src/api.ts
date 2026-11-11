@@ -15,6 +15,7 @@ import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
 import { proposeSlots, redraft, type Tone } from './triage.ts';
 import { searchMail } from './search.ts';
+import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts';
 import type { Archive } from './archive.ts';
 import { composeMail } from './triage.ts';
 import type { PushSub } from './types.ts';
@@ -36,9 +37,16 @@ export interface Deps {
   runCycle(): Promise<void>;
   status(): { running: boolean; error: string | null };
   calendar?: () => CalendarPort | null;
+  backup?: { dir: string; dbPath: string };
+  remote?: {
+    status(): Promise<{ installed: boolean; serving: boolean; url: string | null }>;
+    enable(): Promise<{ url: string | null }>;
+  };
   claudeInfo?: () => Promise<{ installed: boolean; version: string | null }>;
   claudeTest?: () => Promise<{ ok: boolean; ms: number; error?: string }>;
   fetchImpl?: typeof fetch;
+  /** Restart the server (the desktop app relaunches it); used after staging a restore. */
+  restart?: () => void;
 }
 
 function sameSecret(a: string, b: string): boolean {
@@ -93,7 +101,15 @@ export function createApp(d: Deps) {
     await d.oauth.exchange(code, redirect());
     me = null;
     d.runCycle().catch(() => {});
-    return c.redirect('/');
+    const en = getSettings(store, defaults()).language === 'en';
+    return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Calme</title>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0D0E11;color:#EDEBE5;font:16px system-ui">
+<div style="max-width:460px;padding:24px;text-align:center">
+<div style="width:72px;height:72px;margin:0 auto 20px;border-radius:18px;background:#C8F03C;color:#0D0E11;display:grid;place-items:center;font:italic 44px Georgia,serif">c.</div>
+<h1 style="font:italic 400 40px Georgia,serif;margin:0 0 12px">${en ? 'Gmail is connected.' : 'Gmail est connecté.'}</h1>
+<p style="color:#9C9BA3;line-height:1.6">${en ? 'You can close this tab and go back to Calme: it continues on its own.' : 'Tu peux fermer cet onglet et revenir dans Calme : il continue tout seul.'}</p>
+<p><a href="/" style="color:#C8F03C">${en ? 'Open Calme here' : 'Ouvrir Calme ici'}</a></p></div>
+<script>setTimeout(function(){window.close()},2500)</script></body>`);
   });
 
   // --- Pairing token on every API route ---
@@ -442,12 +458,65 @@ export function createApp(d: Deps) {
     c.json(d.claudeTest ? await d.claudeTest() : { ok: false, ms: 0, error: 'Test indisponible' }),
   );
 
+  // --- Backups (daily, automatic; manual and restore from Admin) ---
+  app.get('/api/backup', (c) =>
+    c.json(d.backup ? { dir: d.backup.dir, backups: listBackups(d.backup.dir), last: Number(store.getMeta('lastBackup') ?? 0) || null } : { dir: null, backups: [], last: null }),
+  );
+
+  app.post('/api/backup/now', (c) => {
+    if (!d.backup) return c.json({ error: 'Backups unavailable' }, 400);
+    const b = backupNow(store, d.backup.dir);
+    pruneBackups(d.backup.dir, 7);
+    store.setMeta('lastBackup', String(Date.now()));
+    return c.json(b);
+  });
+
+  // Overwrites the whole database at the next start: only from the computer itself.
+  app.post('/api/backup/restore', async (c) => {
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!d.backup) return c.json({ error: 'Backups unavailable' }, 400);
+    const { name } = await c.req.json<{ name?: string }>();
+    try {
+      stageRestore(d.backup.dir, String(name ?? ''), d.backup.dbPath);
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 400);
+    }
+    d.restart?.();
+    return c.json({ ok: true });
+  });
+
+  // --- iPhone link through Tailscale ---
+  app.get('/api/remote', async (c) => c.json(d.remote ? await d.remote.status() : { installed: false, serving: false, url: null }));
+
+  app.post('/api/remote/enable', async (c) => {
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!d.remote) return c.json({ error: 'Unavailable' }, 400);
+    return c.json(await d.remote.enable());
+  });
+
+  app.get('/api/push/devices', (c) =>
+    c.json(store.listPushSubs().map((p) => ({ endpoint: p.endpoint, name: p.name ?? 'Appareil', addedAt: p.addedAt ?? null }))),
+  );
+
+  app.post('/api/push/devices/remove', async (c) => {
+    const { endpoint } = await c.req.json<{ endpoint?: string }>();
+    if (endpoint) store.removePushSub(endpoint);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/push/test', async (c) => {
+    const { endpoint } = await c.req.json<{ endpoint?: string }>();
+    return c.json({ ok: endpoint ? await d.notifier.test(endpoint) : false });
+  });
+
   app.get('/api/push/key', (c) => c.json({ publicKey: d.cfg.vapid.publicKey }));
 
   app.post('/api/push/subscribe', async (c) => {
     const sub = await c.req.json<PushSub>();
     if (!sub?.endpoint?.startsWith('https://') || !sub.keys?.p256dh || !sub.keys?.auth) return c.json({ error: 'Abonnement invalide' }, 400);
-    store.addPushSub({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    const ua = c.req.header('user-agent') ?? '';
+    const name = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Navigateur';
+    store.addPushSub({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, name, addedAt: Date.now() });
     return c.json({ ok: true });
   });
 

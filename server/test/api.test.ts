@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createApp } from '../src/api.ts';
 import { openArchive } from '../src/archive.ts';
 import type { Config } from '../src/config.ts';
@@ -25,6 +28,7 @@ function setup(gmailConnected = true) {
     { id: 'b', category: 'news', summary: [], action: '', replies: [], group: null },
   ]);
   const g = fakeGmail();
+  const bkRoot = mkdtempSync(join(tmpdir(), 'calme-api-'));
   const archive = openArchive(store.db);
   const fetched: { url: string; init?: RequestInit }[] = [];
   const created: unknown[] = [];
@@ -56,7 +60,7 @@ function setup(gmailConnected = true) {
           }
         : { draft: 'Nouveau brouillon' },
     cfg,
-    notifier: { notifyReplies: async () => {} },
+    notifier: { notifyReplies: async () => {}, test: async () => true },
     runCycle: async () => {},
     status: () => ({ running: false, error: null }),
     calendar: () => ({
@@ -67,6 +71,8 @@ function setup(gmailConnected = true) {
         return { link: 'https://calendar.google.com/event?eid=x' };
       },
     }),
+    backup: { dir: join(bkRoot, 'backups'), dbPath: join(bkRoot, 'calme.db') },
+    remote: { status: async () => ({ installed: true, serving: false, url: null }), enable: async () => ({ url: 'https://mac.tail.ts.net' }) },
     claudeInfo: async () => ({ installed: true, version: '2.1.322 (Claude Code)' }),
     claudeTest: async () => ({ ok: true, ms: 1200 }),
     fetchImpl: async (url, init) => {
@@ -390,6 +396,40 @@ describe('api setup', () => {
   });
 });
 
+describe('api devices', () => {
+  it('lists push devices with a readable name and removes one', async () => {
+    const { app, store } = setup();
+    store.addPushSub({ endpoint: 'https://web.push.apple.com/abc', keys: { p256dh: 'k', auth: 'a' }, name: 'iPhone', addedAt: 1 });
+    const list = await (await app.request('/api/push/devices', { headers: auth })).json();
+    expect(list).toEqual([{ endpoint: 'https://web.push.apple.com/abc', name: 'iPhone', addedAt: 1 }]);
+    await app.request('/api/push/devices/remove', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: 'https://web.push.apple.com/abc' }) });
+    expect(await (await app.request('/api/push/devices', { headers: auth })).json()).toEqual([]);
+  });
+});
+
+describe('api backup and remote', () => {
+  it('backs up now and lists backups', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/backup/now', { method: 'POST', headers: auth })).json();
+    expect(r.name).toMatch(/^calme-\d{4}-\d{2}-\d{2}\.db$/);
+    const list = await (await app.request('/api/backup', { headers: auth })).json();
+    expect(list.backups.map((b: { name: string }) => b.name)).toEqual([r.name]);
+  });
+
+  it('refuses restore and Tailscale changes from another device', async () => {
+    const { app } = setup();
+    const remote = { ...auth, 'content-type': 'application/json', 'x-forwarded-for': '100.64.0.2' };
+    expect((await app.request('/api/backup/restore', { method: 'POST', headers: remote, body: JSON.stringify({ name: 'calme-2026-11-12.db' }) })).status).toBe(403);
+    expect((await app.request('/api/remote/enable', { method: 'POST', headers: remote })).status).toBe(403);
+  });
+
+  it('reports the iPhone link status', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/remote', { headers: auth })).json();
+    expect(r).toMatchObject({ installed: true, serving: false, url: null });
+  });
+});
+
 describe('api quota', () => {
   it('exposes the Gmail quota gauge', async () => {
     const { app } = setup();
@@ -405,7 +445,7 @@ describe('api admin', () => {
     const body = await (await app.request('/api/admin', { headers: auth })).json();
     expect(body.claude).toEqual({ installed: true, version: '2.1.322 (Claude Code)' });
     expect(body.google.connected).toBe(true);
-    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', model: 'haiku', intervalMin: 5 });
+    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, model: 'haiku', intervalMin: 5 });
   });
 
   it('validates and saves settings', async () => {

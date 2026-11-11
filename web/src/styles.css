@@ -443,3 +443,8 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .summary { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
 .summary li { display: flex; align-items: center; gap: 10px; }
 .setup-foot { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.device { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surf2); font-size: 14px; }
+/* Admin with 9 cards: three equal rows. */
+@media (min-width: 1100px) { .grid-cards { grid-template-rows: none; grid-auto-rows: 1fr; } }
+@media (min-width: 721px) and (max-width: 1099px) { .grid-cards { grid-template-rows: none; grid-auto-rows: 1fr; } }

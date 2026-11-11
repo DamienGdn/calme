@@ -3,9 +3,11 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post, when, type Category } from '../api.ts';
 import Icon from '../components/Icon.vue';
+import BackupCard from '../components/BackupCard.vue';
+import IphoneCard from '../components/IphoneCard.vue';
+import NotificationsCard from '../components/NotificationsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
-import { enablePush, pushSupported } from '../push.ts';
 import { notify, notifyError, refresh } from '../store.ts';
 
 interface Settings {
@@ -15,6 +17,9 @@ interface Settings {
   model: string;
   intervalMin: number;
   language: Lang;
+  pushMode: 'all' | 'reply' | 'off';
+  quietStart: number | null;
+  quietEnd: number | null;
 }
 interface AdminView {
   claude: { installed: boolean; version: string | null };
@@ -37,7 +42,8 @@ const { t, locale } = useI18n();
 const v = ref<AdminView | null>(null);
 const test = ref<{ ok: boolean; ms: number; error?: string } | 'running' | null>(null);
 const keep = ref('');
-const canPush = pushSupported() && !window.calmeDesktop;
+// Restore and Tailscale changes are only allowed from the computer running Calme.
+const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 const SCOPE_KEY: Record<string, string> = {
   'https://www.googleapis.com/auth/gmail.modify': 'admin.scope.modify',
   'https://www.googleapis.com/auth/gmail.send': 'admin.scope.send',
@@ -55,7 +61,7 @@ async function load() {
 }
 onMounted(load);
 
-async function save(patch: Partial<Settings>, msg = t('admin.saved')) {
+async function save(patch: Partial<Settings> | Record<string, unknown>, msg = t('admin.saved')) {
   try {
     const settings = await api<Settings>('/api/admin/settings', { method: 'PUT', body: JSON.stringify(patch) });
     if (v.value) v.value.settings = settings;
@@ -85,15 +91,6 @@ async function syncNow() {
   }, 2000);
 }
 
-async function pushHere() {
-  try {
-    await enablePush();
-    notify(t('triage.pushOn'));
-    void load();
-  } catch (e) {
-    notifyError(e);
-  }
-}
 
 const healthy = computed(() => Boolean(v.value?.claude.installed && v.value.google.connected && !v.value.error));
 const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long', year: 'numeric' });
@@ -157,7 +154,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
             </ul>
           </dd>
         </dl>
-        <a class="btn" href="/auth/google" style="align-self: flex-start">{{ t('admin.reconnect') }}</a>
+        <a class="btn" href="/auth/google" target="_blank" rel="opener" style="align-self: flex-start">{{ t('admin.reconnect') }}</a>
         <label style="display: flex; flex-direction: column; gap: 6px; margin-top: auto">
           <span class="eyebrow">{{ t('admin.language') }}</span>
           <select class="select" :value="locale" @change="changeLang(($event.target as HTMLSelectElement).value as Lang)">
@@ -220,15 +217,9 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
         <button type="button" class="btn" style="align-self: flex-start" @click="save({ keepSenders: keep.split(/[\s,;]+/) }, t('admin.listSaved'))">{{ t('admin.saveList') }}</button>
       </section>
 
-      <section class="card" aria-labelledby="a-devices">
-        <h2 id="a-devices">{{ t('admin.notifications') }}</h2>
-        <dl class="kv">
-          <dt>{{ t('admin.devices') }}</dt>
-          <dd>{{ v.pushDevices }}</dd>
-        </dl>
-        <button v-if="canPush" type="button" class="btn" style="align-self: flex-start" @click="pushHere"><Icon name="bell" :size="16" /> {{ t('admin.enableHere') }}</button>
-        <p class="muted" style="margin: 0; font-size: 12px; line-height: 1.5">{{ t('admin.notifNote') }}</p>
-      </section>
+      <BackupCard :local="local" />
+      <NotificationsCard :push-mode="v.settings.pushMode" :quiet-start="v.settings.quietStart" :quiet-end="v.settings.quietEnd" @save="save" />
+      <IphoneCard :local="local" :ai-ok="v.claude.installed" />
 
       <section class="card" aria-labelledby="a-data">
         <h2 id="a-data">{{ t('admin.system') }}</h2>

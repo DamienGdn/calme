@@ -1,6 +1,6 @@
 // Calme desktop: runs the Calme server in the background (inside the app), shows a menu bar icon
 // with the number of mails awaiting a reply, and notifies every new mail.
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, powerSaveBlocker, shell } = require('electron');
 const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -22,6 +22,7 @@ function loadSettings() {
     token: s.token || null,
     loginItemConfigured: Boolean(s.loginItemConfigured),
     notify: s.notify || 'all', // 'all' | 'reply' | 'off'
+    keepAwake: s.keepAwake !== false, // the computer must stay awake to fetch mail and serve the iPhone
   };
 }
 function saveSettings() {
@@ -37,6 +38,16 @@ let seen = null; // ids already notified; null until the first successful poll
 let counts = { reply: 0, total: 0 };
 let server = null;
 let serverRestarts = 0;
+let awakeId = null;
+
+/** Keeps the computer from sleeping while Calme runs (the display may still turn off). */
+function applyKeepAwake() {
+  if (settings.keepAwake && awakeId === null) awakeId = powerSaveBlocker.start('prevent-app-suspension');
+  if (!settings.keepAwake && awakeId !== null) {
+    powerSaveBlocker.stop(awakeId);
+    awakeId = null;
+  }
+}
 let lastError = null;
 
 const isLocal = () => /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(new URL(settings.serverUrl).origin);
@@ -142,11 +153,18 @@ function createWindow() {
     win.loadURL(errorPage(`Le serveur ne répond pas (${desc}).`));
     setTimeout(() => ensureServer().then(() => win && win.loadURL(settings.serverUrl)), 3000);
   });
+  // Google refuses sign-in inside embedded windows: the Gmail authorisation always opens in the default browser.
+  const isGoogleAuth = (url) => /^https?:/i.test(url) && new URL(url).pathname.startsWith('/auth/google');
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e, url) => {
+    if (isGoogleAuth(url)) {
+      e.preventDefault();
+      shell.openExternal(url);
+      return;
+    }
     if (url.startsWith('data:') || new URL(url).origin === origin()) return;
     e.preventDefault();
     if (/^https?:/i.test(url)) shell.openExternal(url);
@@ -188,14 +206,14 @@ const TEXT = {
     toAnswer: (n) => `${n} à répondre`, none: 'Rien à répondre', many: (n) => `${n} nouveaux mails`,
     open: 'Ouvrir Calme', compose: 'Nouveau message', sync: 'Relever maintenant', notifications: 'Notifications',
     notifyAll: 'Chaque nouveau mail', notifyReply: 'Seulement « À répondre »', notifyOff: 'Désactivées',
-    login: 'Lancer au démarrage du Mac', log: 'Journal du serveur', quit: 'Quitter Calme',
+    login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calme',
   },
   en: {
     cat: { reply: 'To answer', read: 'To read', news: 'Newsletter', trash: 'To delete' },
     toAnswer: (n) => `${n} to answer`, none: 'Nothing to answer', many: (n) => `${n} new mails`,
     open: 'Open Calme', compose: 'New message', sync: 'Fetch mail now', notifications: 'Notifications',
     notifyAll: 'Every new mail', notifyReply: 'Only “To answer”', notifyOff: 'Off',
-    login: 'Open at login', log: 'Server log', quit: 'Quit Calme',
+    login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calme',
   },
 };
 const tx = () => TEXT[lang] ?? TEXT.en;
@@ -260,6 +278,16 @@ function refreshTray() {
         ],
       },
       { label: tx().login, type: 'checkbox', checked: login, click: (i) => app.setLoginItemSettings({ openAtLogin: i.checked, openAsHidden: true }) },
+      {
+        label: tx().awake,
+        type: 'checkbox',
+        checked: settings.keepAwake,
+        click: (i) => {
+          settings.keepAwake = i.checked;
+          saveSettings();
+          applyKeepAwake();
+        },
+      },
       { label: tx().log, click: () => shell.openPath(path.join(CALME_HOME, 'server.log')) },
       { type: 'separator' },
       { label: tx().quit, click: () => { quitting = true; app.quit(); } },
@@ -291,6 +319,7 @@ if (!app.requestSingleInstanceLock()) {
       saveSettings();
       void poll();
     });
+    applyKeepAwake();
     refreshTray();
     await ensureServer();
     createWindow();

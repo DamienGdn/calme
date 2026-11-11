@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
 import Icon from '../components/Icon.vue';
@@ -74,6 +74,22 @@ async function savePref(patch: Partial<SetupState['settings']>) {
     notifyError(e);
   }
 }
+
+// While waiting for Google (consent happens in the browser), check every 3 s and move on by itself.
+let waitTimer = 0;
+watch(step, (st) => {
+  window.clearInterval(waitTimer);
+  if (st !== 1) return;
+  waitTimer = window.setInterval(async () => {
+    await load();
+    if (s.value?.gmail) {
+      window.clearInterval(waitTimer);
+      notify(t('setup.google.connected', { account: s.value.account ?? '' }));
+      step.value = 2;
+    }
+  }, 3000);
+});
+onBeforeUnmount(() => window.clearInterval(waitTimer));
 
 async function finish() {
   await post('/api/setup/complete');
@@ -163,7 +179,8 @@ claude   # {{ t('setup.claude.login') }}</pre>
         </template>
 
         <template v-else-if="!s.gmail">
-          <a v-if="s.local" class="btn btn-prim" href="/auth/google" style="align-self: flex-start">{{ t('setup.google.connect') }}</a>
+          <a v-if="s.local" class="btn btn-prim" href="/auth/google" target="_blank" rel="opener" style="align-self: flex-start">{{ t('setup.google.connect') }}</a>
+          <p v-if="s.local" class="muted" style="font-size: 13px">{{ t('setup.google.waiting') }}</p>
           <p v-else class="banner"><span>{{ t('setup.google.onlyLocal') }}</span></p>
           <p class="muted" style="font-size: 13px; line-height: 1.6">{{ t('setup.google.unverified') }}</p>
         </template>

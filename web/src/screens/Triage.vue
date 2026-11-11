@@ -132,7 +132,7 @@ function askCalme() {
     </div>
     <div v-else-if="store.state?.gmail === 'disconnected'" class="banner">
       <p>{{ t('triage.disconnected') }}</p>
-      <a class="btn btn-prim" href="/auth/google">{{ t('triage.connect') }}</a>
+      <a class="btn btn-prim" href="/auth/google" target="_blank" rel="opener">{{ t('triage.connect') }}</a>
     </div>
     <div v-else-if="store.state?.error" class="banner"><p>{{ t('triage.lastError', { error: store.state.error }) }}</p></div>
 
