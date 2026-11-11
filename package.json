@@ -16,5 +16,6 @@
       "electron",
       "esbuild"
     ]
-  }
+  },
+  "license": "SEE LICENSE IN LICENSE"
 }

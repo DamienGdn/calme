@@ -14,6 +14,7 @@ import Folders from './screens/Folders.vue';
 import Newsletters from './screens/Newsletters.vue';
 import Pairing from './screens/Pairing.vue';
 import Search from './screens/Search.vue';
+import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
 import { draft, parseHash, refresh, store, toggleTheme, type Route } from './store.ts';
 
@@ -95,6 +96,7 @@ const depth = (name: string) => name.split('/').length - 1;
 
 <template>
   <Pairing v-if="!store.paired" />
+  <Setup v-else-if="store.state && (store.state.setupDone === false || route === 'installation')" />
   <div v-else class="shell">
     <aside class="sidebar" :aria-label="t('nav.main')">
       <div class="brand">

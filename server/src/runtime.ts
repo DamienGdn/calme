@@ -25,6 +25,8 @@ export function createRuntime() {
   const runner: ClaudeRunner = withLanguage((i) => cliRunner(settings().model)(i), () => settings().language);
   const notifier = createNotifier(store, cfg.vapid);
   const archive = openArchive(store.db);
+  // Installs configured before the setup wizard existed skip it.
+  if (store.getMeta('setupDone') === null && baseOAuth.isConnected()) store.setMeta('setupDone', '1');
 
   let port: GmailPort | null = null;
   let bgPort: GmailPort | null = null;

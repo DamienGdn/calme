@@ -420,3 +420,26 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 
 [data-desktop='mac'] .topbar, [data-desktop='mac'] .topbar * { -webkit-app-region: no-drag; }
 @media (max-width: 720px) { [data-desktop='mac'] .main { padding-top: 48px; } }
+
+/* Setup wizard */
+.setup { min-height: 100vh; max-width: 980px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 48px) 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px; }
+[data-desktop='mac'] .setup { padding-top: 52px; }
+.setup-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.steps li { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surf); font-size: 13px; color: var(--muted); }
+.steps li .mono { margin-right: 6px; }
+.steps li.active { border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.steps li.done { color: var(--accent-text); }
+@media (max-width: 720px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.setup-card { display: flex; flex-direction: column; gap: 18px; padding: clamp(20px, 3vw, 36px); border-radius: 24px; background: var(--surf); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.setup-card .lead { margin: 0; font-size: 16px; line-height: 1.6; color: var(--body); max-width: 68ch; }
+.check { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; }
+.check.ko .dot, .status.ko .dot { background: var(--hot); box-shadow: none; }
+.status.ok { color: var(--accent-text); }
+.status.ko { color: var(--hot-text); }
+.code { margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); font-family: 'Geist Mono', monospace; font-size: 13px; overflow-x: auto; }
+.howto { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.6; }
+.howto a { color: var(--accent-text); }
+.summary { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.summary li { display: flex; align-items: center; gap: 10px; }
+.setup-foot { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }

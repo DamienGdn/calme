@@ -70,6 +70,9 @@ of mails to answer in the menu bar and notifies you of every new mail. Logs: `~/
 
 ### 3. Connect Gmail (once, ~10 minutes)
 
+On first launch, a **setup assistant** checks Claude Code, guides you through the Google steps below, lets you drop
+the downloaded client file into the app and authorises Gmail and Calendar. You can run it again from *Admin*.
+
 Google requires every app to have its own OAuth client. It is free.
 
 1. Open <https://console.cloud.google.com>, create a project.
@@ -135,6 +138,14 @@ pnpm test                 # server tests (Vitest)
 pnpm -C web dev           # UI dev server (proxies /api to :4747)
 pnpm -C server typecheck
 ```
+
+---
+
+## License
+
+MIT with the [Commons Clause](LICENSE): free to use, fork and modify — **not for sale** (you may not sell Calme or a
+product or service whose value derives substantially from it). Contributions are welcome through pull requests on
+this repository — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 

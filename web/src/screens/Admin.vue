@@ -104,6 +104,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
   <template v-else>
     <header class="topbar">
       <span class="eyebrow">{{ t('admin.eyebrow') }}</span>
+      <a class="btn" href="#/installation">{{ t('admin.rerunSetup') }}</a>
       <button type="button" class="btn" @click="load"><Icon name="refresh" :size="16" /> {{ t('common.refresh') }}</button>
     </header>
 

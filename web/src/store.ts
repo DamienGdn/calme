@@ -48,8 +48,8 @@ export function toggleTheme() {
   store.theme = next;
 }
 
-export type Route = 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche';
-const ROUTES: Route[] = ['tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche'];
+export type Route = 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
+const ROUTES: Route[] = ['tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];
 
 /** Hash routes: #/tri[/reply], #/dossiers[/<labelId>], #/recherche[/<question>]… */
 export function parseHash(): { route: Route; arg: string } {

@@ -34,6 +34,13 @@ export class MissingCredentials extends Error {
   }
 }
 
+/** A Google OAuth client file ("Desktop app" or "Web"), as downloaded from Google Cloud. */
+export function validateCredentials(raw: unknown): boolean {
+  const c = (raw as { installed?: unknown; web?: unknown })?.installed ?? (raw as { web?: unknown })?.web;
+  const o = c as { client_id?: unknown; client_secret?: unknown } | undefined;
+  return typeof o?.client_id === 'string' && /\.apps\.googleusercontent\.com$/.test(o.client_id) && typeof o.client_secret === 'string' && o.client_secret.length > 0;
+}
+
 export function createOAuth(home: string) {
   const credPath = join(home, 'credentials.json');
   const tokenPath = join(home, 'token.json');
@@ -52,6 +59,10 @@ export function createOAuth(home: string) {
   }
 
   return {
+    saveCredentials(raw: unknown) {
+      if (!validateCredentials(raw)) throw new Error('Not a Google OAuth client file');
+      writePrivate(credPath, JSON.stringify(raw, null, 2));
+    },
     hasCredentials: () => existsSync(credPath),
     isConnected: () => existsSync(tokenPath),
     client: () => client(),

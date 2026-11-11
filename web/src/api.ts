@@ -16,6 +16,7 @@ export interface AppState {
   running: boolean;
   error: string | null;
   language?: 'fr' | 'en';
+  setupDone?: boolean;
 }
 
 export interface CleanupView {

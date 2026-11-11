@@ -28,6 +28,7 @@ function setup(gmailConnected = true) {
   const archive = openArchive(store.db);
   const fetched: { url: string; init?: RequestInit }[] = [];
   const created: unknown[] = [];
+  const saved: unknown[] = [];
   store.saveAnalyses([
     { id: 'a', category: 'trash', summary: [], action: '', replies: [], group: 'Promotions',
       event: { title: 'AG', start: '2026-12-03T18:30:00+01:00', end: '2026-12-03T20:00:00+01:00', location: null } },
@@ -36,7 +37,7 @@ function setup(gmailConnected = true) {
     store,
     archive,
     gmail: () => (gmailConnected ? (g.port as GmailPort) : null),
-    oauth: { hasCredentials: () => true, isConnected: () => gmailConnected, authUrl: () => 'https://accounts', exchange: async () => {} },
+    oauth: { hasCredentials: () => true, isConnected: () => gmailConnected, authUrl: () => 'https://accounts', exchange: async () => {}, saveCredentials: (raw: unknown) => saved.push(raw) },
     runner: async (i) =>
       JSON.stringify(i.schema).includes('"body"')
         ? { subject: 'Petit retard', body: 'Coucou Sophie, j’aurai 10 minutes de retard. [Prénom]' }
@@ -73,7 +74,7 @@ function setup(gmailConnected = true) {
       return new Response('ok');
     },
   });
-  return { app, store, g, fetched, created, archive };
+  return { app, store, g, fetched, created, archive, saved };
 }
 
 const auth = { Authorization: `Bearer ${TOKEN}` };
@@ -353,6 +354,39 @@ describe('api contacts and compose', () => {
     expect(await res.json()).toEqual({ subject: 'Petit retard', body: 'Coucou Sophie, j’aurai 10 minutes de retard. [Prénom]' });
     const bad = await app.request('/api/compose', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ brief: '' }) });
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('api setup', () => {
+  it('reports what is left to configure and stays pending until completed', async () => {
+    const { app } = setup();
+    const s = await (await app.request('/api/setup', { headers: auth })).json();
+    expect(s).toMatchObject({ claude: { installed: true }, credentials: true, gmail: true, done: false });
+    expect((await (await app.request('/api/state', { headers: auth })).json()).setupDone).toBe(false);
+    await app.request('/api/setup/complete', { method: 'POST', headers: auth });
+    expect((await (await app.request('/api/state', { headers: auth })).json()).setupDone).toBe(true);
+  });
+
+  it('accepts a Google OAuth client file only from this computer, and only a valid one', async () => {
+    const { app, saved } = setup();
+    const valid = { installed: { client_id: 'x.apps.googleusercontent.com', client_secret: 'secret', redirect_uris: ['http://localhost'] } };
+    const remote = await app.request('/api/setup/credentials', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json', 'x-forwarded-for': '100.64.0.2' },
+      body: JSON.stringify(valid),
+    });
+    expect(remote.status).toBe(403);
+    expect(saved).toEqual([]);
+  });
+
+  it('rejects a file that is not a Google OAuth desktop client', async () => {
+    const { app } = setup();
+    const res = await app.request('/api/setup/credentials', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ hello: 'world' }),
+    });
+    expect([400, 403]).toContain(res.status);
   });
 });
 

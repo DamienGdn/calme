@@ -12,7 +12,7 @@ import type { Store } from './store.ts';
 import { decodeEntities, parseAddress, parseGmailMessage } from './mime.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
-import { quotaUsage, SCOPES } from './gmail.ts';
+import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
 import { proposeSlots, redraft, type Tone } from './triage.ts';
 import { searchMail } from './search.ts';
 import type { Archive } from './archive.ts';
@@ -28,6 +28,7 @@ export interface Deps {
     isConnected(): boolean;
     authUrl(redirect: string): string;
     exchange(code: string, redirect: string): Promise<void>;
+    saveCredentials?(raw: unknown): void;
   };
   runner: ClaudeRunner;
   cfg: Config;
@@ -112,12 +113,41 @@ export function createApp(d: Deps) {
       lastSync: Number(store.getMeta('lastSync') ?? 0) || null,
       analyzing: store.countUnanalyzed(),
       language: getSettings(store, defaults()).language,
+      setupDone: store.getMeta('setupDone') === '1',
       running: st.running,
       error: st.error,
     });
   });
 
   app.get('/api/quota', (c) => c.json(quotaUsage()));
+
+  // --- First-run setup wizard ---
+  app.get('/api/setup', async (c) => {
+    const connected = Boolean(d.oauth.hasCredentials() && d.oauth.isConnected() && d.gmail());
+    return c.json({
+      claude: d.claudeInfo ? await d.claudeInfo() : { installed: false, version: null },
+      credentials: d.oauth.hasCredentials(),
+      gmail: connected,
+      account: connected ? await myEmail().catch(() => null) : null,
+      local: isLocalRequest(c),
+      settings: getSettings(store, defaults()),
+      done: store.getMeta('setupDone') === '1',
+    });
+  });
+
+  // The Google client secret is only accepted from this computer (like the Google sign-in itself).
+  app.post('/api/setup/credentials', async (c) => {
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    const raw = await c.req.json().catch(() => null);
+    if (!validateCredentials(raw)) return c.json({ error: 'This is not a Google OAuth client file (type “Desktop app”).' }, 400);
+    d.oauth.saveCredentials?.(raw);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/setup/complete', (c) => {
+    store.setMeta('setupDone', '1');
+    return c.json({ ok: true });
+  });
 
   app.get('/api/contacts', async (c) => {
     const me = d.gmail() ? await myEmail().catch(() => '') : '';
