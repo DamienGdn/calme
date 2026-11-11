@@ -99,6 +99,9 @@ export function parseListUnsubscribe(value?: string, post?: string): Unsub | nul
   return Object.keys(out).length ? out : null;
 }
 
+/** Very large HTML (heavy newsletters) is not kept: the text version is shown instead. */
+const keepHtml = (h: string) => (h.length <= 1_500_000 ? h : undefined);
+
 export function parseGmailMessage(msg: gmail_v1.Schema$Message): MailMessage {
   const root = msg.payload ?? undefined;
   const parts = walk(root);
@@ -118,6 +121,7 @@ export function parseGmailMessage(msg: gmail_v1.Schema$Message): MailMessage {
     date: Number(msg.internalDate ?? 0),
     snippet: decodeEntities(msg.snippet ?? ''),
     text: text.replace(/\r\n/g, '\n'),
+    html: html ? keepHtml(decodeBody(html)) : undefined,
     messageIdHeader: header(root, 'Message-ID') || header(root, 'Message-Id'),
     references: header(root, 'References'),
     unsub: parseListUnsubscribe(header(root, 'List-Unsubscribe') || undefined, header(root, 'List-Unsubscribe-Post') || undefined),

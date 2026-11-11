@@ -128,3 +128,27 @@ describe('buildMime', () => {
     expect(() => buildMime({ from: 'a@x.fr', to: 'b@x.fr\r\nBcc: c@x.fr', subject: 'x', body: 'y', attachments: [] })).toThrow();
   });
 });
+
+describe('parseGmailMessage html', () => {
+  it('keeps the HTML part next to the text one', () => {
+    const m = parseGmailMessage({
+      id: 'h1',
+      payload: {
+        mimeType: 'multipart/alternative',
+        headers: [{ name: 'From', value: 'A <a@x.fr>' }],
+        parts: [
+          { mimeType: 'text/plain', body: { data: Buffer.from('plain').toString('base64url') } },
+          { mimeType: 'text/html', body: { data: Buffer.from('<p>riche</p>').toString('base64url') } },
+        ],
+      },
+    });
+    expect(m.text).toBe('plain');
+    expect(m.html).toBe('<p>riche</p>');
+  });
+
+  it('has no html for a plain-text mail', () => {
+    const m = parseGmailMessage({ id: 'p1', payload: { mimeType: 'text/plain', headers: [], body: { data: Buffer.from('x').toString('base64url') } } });
+    expect(m.html).toBeUndefined();
+  });
+});
+

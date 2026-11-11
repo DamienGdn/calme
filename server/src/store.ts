@@ -38,6 +38,11 @@ export function openStore(path: string) {
       return (db.prepare('SELECT data FROM messages').all() as { data: string }[]).map((r) => JSON.parse(r.data));
     },
 
+    /** Keeps a mail's HTML fetched later (mails stored before Calme kept HTML); '' means it has none. */
+    setHtml(id: string, html: string): void {
+      db.prepare("UPDATE messages SET data = json_set(data, '$.html', ?) WHERE id = ?").run(html, id);
+    },
+
     /** True when Calme has ever stored this mail (in the inbox or not). */
     known(id: string): boolean {
       return db.prepare('SELECT 1 FROM messages WHERE id = ?').get(id) !== undefined;

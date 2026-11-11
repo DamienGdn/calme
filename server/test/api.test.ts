@@ -576,3 +576,30 @@ describe('pairing a screen from afar (iPhone home-screen app)', () => {
     expect(await look(app, 'f'.repeat(32))).toEqual({ status: 'expired' });
   });
 });
+
+describe('formatted mail (HTML)', () => {
+  it('serves the stored HTML, cleaned, and keeps it out of the light views', async () => {
+    const { app, store } = setup();
+    store.upsertMessages([mail('h', { html: '<p>Bonjour</p><script>x()</script>' })]);
+    const r = await (await app.request('/api/mail/h/html', { headers: auth })).json();
+    expect(r.html).toBe('<p>Bonjour</p>');
+    const state = await (await app.request('/api/state', { headers: auth })).json();
+    expect(state.emails.find((m: { id: string }) => m.id === 'h')).not.toHaveProperty('html');
+    expect(await (await app.request('/api/mail/h', { headers: auth })).json()).not.toHaveProperty('html');
+  });
+
+  it('fetches the HTML from Gmail once for a mail stored before, then keeps it', async () => {
+    const { app, store, g } = setup();
+    store.upsertMessages([mail('html1')]);
+    const first = await (await app.request('/api/mail/html1/html', { headers: auth })).json();
+    expect(first.html).toBe('<p>riche html1</p>');
+    await app.request('/api/mail/html1/html', { headers: auth });
+    expect(g.calls.filter((c) => c.method === 'get' && c.args[0] === 'html1')).toHaveLength(1);
+  });
+
+  it('answers null for a plain-text mail', async () => {
+    const { app, store } = setup();
+    store.upsertMessages([mail('plain1')]);
+    expect(await (await app.request('/api/mail/plain1/html', { headers: auth })).json()).toEqual({ html: null });
+  });
+});

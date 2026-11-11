@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="swipe" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @click.capture="click" @contextmenu="swallow && $event.preventDefault()">
+  <div :class="['swipe', { swiping: dx > 0 }]" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="cancel" @click.capture="click" @contextmenu="swallow && $event.preventDefault()">
     <div class="swipe-bg" aria-hidden="true" :style="{ opacity: Math.min(1, dx / 80) }"><Icon name="trash" :size="18" /> {{ label }}</div>
     <div :class="['swipe-fg', { moving: dx > 0 }]" :style="{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dragging ? 'none' : 'transform 0.18s ease' }">
       <slot />

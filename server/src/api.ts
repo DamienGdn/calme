@@ -9,6 +9,7 @@ import type { Config } from './config.ts';
 import { GmailDisconnected, type GmailPort } from './gmail.ts';
 import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
+import { safeMailHtml } from './mailHtml.ts';
 import { decodeEntities, parseAddress, parseGmailMessage } from './mime.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
@@ -198,7 +199,7 @@ export function createApp(d: Deps) {
     return c.json({
       gmail: !d.oauth.hasCredentials() ? 'no-credentials' : d.oauth.isConnected() && d.gmail() ? 'connected' : 'disconnected',
       counts: store.counts(),
-      emails: store.listInbox().map(({ text: _text, ...light }) => light),
+      emails: store.listInbox().map(({ text: _text, html: _html, ...light }) => light),
       lastSync: Number(store.getMeta('lastSync') ?? 0) || null,
       analyzing: store.countUnanalyzed(),
       language: getSettings(store, defaults()).language,
@@ -286,7 +287,25 @@ export function createApp(d: Deps) {
 
   app.get('/api/mail/:id', (c) => {
     const m = store.getMail(c.req.param('id'));
-    return m ? c.json(m) : c.json({ error: 'Mail introuvable' }, 404);
+    if (!m) return c.json({ error: 'Mail introuvable' }, 404);
+    const { html: _html, ...rest } = m;
+    return c.json(rest);
+  });
+
+  // The mail's formatted version, cleaned (mailHtml.ts). Mails stored before Calme kept HTML get it from Gmail once.
+  app.get('/api/mail/:id/html', async (c) => {
+    const id = c.req.param('id');
+    const m = store.getMail(id);
+    if (!m) return c.json({ error: 'Mail introuvable' }, 404);
+    let html = m.html;
+    if (html === undefined) {
+      const g = d.gmail();
+      if (g) {
+        html = parseGmailMessage(await g.get(id)).html ?? '';
+        store.setHtml(id, html);
+      }
+    }
+    return c.json({ html: html ? safeMailHtml(html) : null });
   });
 
   app.post('/api/sync', async (c) => {

@@ -8,7 +8,16 @@ export function rawMessage(id: string, extraHeaders: Record<string, string> = {}
     internalDate: '1762851600000',
     labelIds: ['INBOX'],
     snippet: 'snip ' + id,
-    payload: {
+    payload: id.startsWith('html')
+      ? {
+          mimeType: 'multipart/alternative',
+          headers: [{ name: 'From', value: 'Sophie <s@x.fr>' }, { name: 'Subject', value: 'Sujet ' + id }],
+          parts: [
+            { mimeType: 'text/plain', body: { data: Buffer.from('corps ' + id).toString('base64url') } },
+            { mimeType: 'text/html', body: { data: Buffer.from('<p onclick="x()">riche ' + id + '</p>').toString('base64url') } },
+          ],
+        }
+      : {
       mimeType: 'text/plain',
       headers: Object.entries({ From: 'Sophie <s@x.fr>', Subject: 'Sujet ' + id, 'Message-ID': `<${id}@x.fr>`, ...extraHeaders }).map(
         ([name, value]) => ({ name, value }),

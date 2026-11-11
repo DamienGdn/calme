@@ -506,19 +506,20 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
   .triage-bar .field { flex: 1 1 0; min-width: 0; }
 
   .headline { font-size: 34px; line-height: 1.02; max-width: none; }
-  .segs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; gap: 6px; }
-  .segs::-webkit-scrollbar { display: none; }
-  .seg { flex: 0 0 auto !important; min-height: 0; flex-direction: row; align-items: baseline; gap: 8px; padding: 10px 16px; border-radius: 999px; }
-  .seg .n { font-size: 22px; }
-  .seg .l { font-size: 13px; }
+  .segs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .seg { min-width: 0; min-height: 0; gap: 4px; padding: 10px 10px 9px; border-radius: 14px; }
+  .seg .n { font-size: 24px; }
+  .seg .l { font-size: 11px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row { padding: 14px 12px; border-radius: 14px; }
   .row .subj { font-size: 20px; }
 
   .reader { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 20px; }
   .reader h2 { font-size: 32px; }
   .reader-top {
-    position: sticky; top: 0; z-index: 5; margin: 0 -16px; gap: 10px;
-    padding: calc(env(safe-area-inset-top) + 8px) 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 5; gap: 10px; background: var(--bg); border-bottom: 1px solid var(--line);
+    /* Pulled up into the page's top padding (status bar room) so that room is counted once, not twice. */
+    margin: calc(-1 * (env(safe-area-inset-top) + 16px)) -16px 0;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px 10px;
   }
   .reader-top .back { padding: 0 12px 0 8px; min-height: 40px; }
   .reader-top .btn-icon { width: 40px; min-height: 40px; }
@@ -539,7 +540,9 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .selbar .btn { min-height: 40px; }
 
 /* Swipe a mail right to trash it (touch). Vertical drags stay the page's scroll. */
-.swipe { flex: none; position: relative; border-radius: 16px; overflow: hidden; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.swipe { flex: none; position: relative; border-radius: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.swipe.swiping { overflow: hidden; }
+.swipe:not(.swiping) .swipe-bg { display: none; }
 .swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding-left: 22px; background: var(--danger); color: #0d0e11; font-size: 14px; font-weight: 600; }
 .swipe-fg { position: relative; }
 .swipe-fg.moving { background: var(--bg); border-radius: 16px; }
@@ -560,3 +563,14 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .pair-req strong { flex: 1 1 100%; font-size: 15px; }
 .pair-req p { flex: 1 1 100%; margin: 0; font-size: 13px; color: var(--muted); }
 @keyframes pulse { 50% { opacity: 0.3; } }
+
+/* Formatted mail: its own design on a white sheet, sized to its content. */
+.mail-html { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.mail-paper { border-radius: 16px; overflow: hidden; background: #fff; border: 1px solid var(--line); }
+.mail-paper iframe { display: block; width: 100%; border: 0; background: #fff; }
+.img-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surf2); font-size: 13px; color: var(--muted); }
+.img-bar span { flex: 1 1 220px; }
+.img-bar .btn { min-height: 36px; font-size: 13px; }
+.mail-loading { min-height: 160px; border-radius: 16px; background: var(--surf2); animation: pulse 1.4s ease-in-out infinite; }
+.mail-body a { color: var(--accent-text); overflow-wrap: anywhere; }
+@media (max-width: 720px) { .mail-paper { margin: 0 -16px; border-radius: 0; border-width: 1px 0; } }

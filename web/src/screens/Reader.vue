@@ -5,6 +5,7 @@ import { api, CAT_COLOR, post, useMailBody, when, type MailItem } from '../api.t
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
+import MailBody from '../components/MailBody.vue';
 import UnsubBar from './UnsubBar.vue';
 
 const props = defineProps<{ mail: MailItem; busy: boolean }>();
@@ -86,7 +87,7 @@ function eventDate(start: string, end: string) {
 
     <UnsubBar v-if="mail.unsub" :mail="mail" />
 
-    <div class="mail-body">{{ body ?? mail.snippet }}</div>
+    <MailBody :mail-id="mail.id" :text="body ?? mail.snippet" />
 
     <div v-if="mail.attachmentNames.length" class="pj">
       <span v-for="n in mail.attachmentNames" :key="n"><Icon name="clip" :size="14" /> {{ n }}</span>

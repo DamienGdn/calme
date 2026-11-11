@@ -25,6 +25,8 @@ export interface MailMessage {
   date: number;
   snippet: string;
   text: string;
+  /** The mail's own HTML (not cleaned: see mailHtml.ts), when it has one. */
+  html?: string;
   messageIdHeader: string;
   references: string;
   unsub: Unsub | null;

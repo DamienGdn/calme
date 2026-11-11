@@ -23,6 +23,8 @@ if (fromNotification) updateTabs((st) => openTab(st, fromNotification));
 const reading = ref(Boolean(fromNotification));
 const wide = useMedia('(min-width: 1180px)');
 const pushOn = ref(true);
+/** The rows' entrance animation plays once, not each time the list comes back (phone, after reading a mail). */
+const animateRows = ref(true);
 const busy = ref(false);
 const canPush = pushSupported() && !window.calmeDesktop;
 
@@ -227,6 +229,7 @@ function onKey(e: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKey);
   window.addEventListener('popstate', onPop);
+  window.setTimeout(() => (animateRows.value = false), 1500);
   if (canPush) void isSubscribed().then((v) => (pushOn.value = v));
 });
 onBeforeUnmount(() => {
@@ -327,7 +330,7 @@ function askCalme() {
       <SwipeRow v-for="(m, i) in list" :key="m.id" :label="t('triage.trashShort')" @trash="trash(m)" @hold="toggleSelected(m.id)">
         <button
           type="button"
-          :class="['row rise', { open: tabs.ids.includes(m.id), picked: selected.has(m.id) }]"
+          :class="['row', { rise: animateRows, open: tabs.ids.includes(m.id), picked: selected.has(m.id) }]"
           :style="{ animationDelay: `${Math.min(i, 10) * 50}ms` }"
           :aria-current="!selecting && current?.id === m.id"
           :aria-pressed="selecting ? selected.has(m.id) : undefined"
