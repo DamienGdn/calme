@@ -99,6 +99,18 @@ export function parseListUnsubscribe(value?: string, post?: string): Unsub | nul
   return Object.keys(out).length ? out : null;
 }
 
+/** Images a mail embeds and references from its HTML as cid:… (signatures, pasted pictures). */
+export function inlineImages(msg: gmail_v1.Schema$Message): { cid: string; mimeType: string; data: string | null; attachmentId: string | null }[] {
+  return walk(msg.payload ?? undefined)
+    .filter((p) => p.mimeType?.startsWith('image/') && header(p, 'Content-ID'))
+    .map((p) => ({
+      cid: header(p, 'Content-ID').trim().replace(/^<|>$/g, ''),
+      mimeType: p.mimeType as string,
+      data: p.body?.data ?? null,
+      attachmentId: p.body?.attachmentId ?? null,
+    }));
+}
+
 /** Very large HTML (heavy newsletters) is not kept: the text version is shown instead. */
 const keepHtml = (h: string) => (h.length <= 1_500_000 ? h : undefined);
 

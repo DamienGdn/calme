@@ -613,3 +613,17 @@ describe('remote images setting', () => {
     expect((await (await app.request('/api/state', { headers: auth })).json()).remoteImages).toBe(false);
   });
 });
+
+describe('embedded images (signatures)', () => {
+  it('puts the images a mail embeds right into its HTML, fetched once', async () => {
+    const { app, store, g } = setup();
+    store.upsertMessages([mail('cid1', { html: '<p>Bonjour</p><img src="cid:logo@x"><img src="cid:photo@x">' })]);
+    const { html } = await (await app.request('/api/mail/cid1/html', { headers: auth })).json();
+    expect(html).toContain(`src="data:image/png;base64,${Buffer.from('PNGDATA').toString('base64')}"`);
+    expect(html).toContain(`src="data:image/jpeg;base64,${Buffer.from('JPGDATA').toString('base64')}"`);
+    expect(html).not.toContain('cid:');
+    await app.request('/api/mail/cid1/html', { headers: auth });
+    expect(g.calls.filter((c) => c.method === 'get')).toHaveLength(1);
+    expect(g.calls.filter((c) => c.method === 'attachment')).toHaveLength(1);
+  });
+});

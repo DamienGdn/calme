@@ -18,6 +18,8 @@ export interface GmailPort {
   modify(id: string, add: string[], remove: string[]): Promise<void>;
   trash(id: string): Promise<void>;
   untrash(id: string): Promise<void>;
+  /** An attachment's bytes, base64url-encoded. */
+  attachment(messageId: string, attachmentId: string): Promise<string>;
   send(raw: string, threadId?: string): Promise<void>;
   listLabels(): Promise<{ id: string; name: string }[]>;
   profileEmail(): Promise<string>;
@@ -92,7 +94,7 @@ function isRateLimit(e: unknown): boolean {
  * Every call takes its cost from a shared 5,000-unit budget (safety margin), then runs;
  * a 429 still slipping through is retried after a pause.
  */
-export const COST = { list: 5, getFull: 60, getMeta: 20, modify: 5, trash: 20, untrash: 20, send: 100, labels: 1, profile: 1 } as const;
+export const COST = { list: 5, getFull: 60, getMeta: 20, modify: 5, trash: 20, untrash: 20, attachment: 5, send: 100, labels: 1, profile: 1 } as const;
 const take = createThrottle(5000);
 
 /** Gmail's own per-user limit, shown in the quota gauge (Calme keeps below its 5,000-unit budget). */
@@ -158,6 +160,9 @@ export function createGmailPort(auth: OAuth2Client, background = false): GmailPo
     },
     async untrash(id) {
       await call(COST.untrash, () => users.messages.untrash({ userId: 'me', id }));
+    },
+    async attachment(messageId, id) {
+      return (await call(COST.attachment, () => users.messages.attachments.get({ userId: 'me', messageId, id }))).data.data ?? '';
     },
     async send(raw, threadId) {
       await call(COST.send, () => users.messages.send({ userId: 'me', requestBody: { raw, threadId } }));

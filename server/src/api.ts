@@ -10,7 +10,7 @@ import { GmailDisconnected, type GmailPort } from './gmail.ts';
 import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
 import { safeMailHtml } from './mailHtml.ts';
-import { decodeEntities, parseAddress, parseGmailMessage } from './mime.ts';
+import { decodeEntities, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
@@ -69,6 +69,21 @@ function sameSecret(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
+}
+
+const MAX_EMBEDDED = 3_000_000;
+
+/** Replaces cid: references with the embedded images (data: URLs); unknown or too large ones are dropped. */
+async function embedImages(g: GmailPort, id: string, html: string, msg: Awaited<ReturnType<GmailPort['get']>>): Promise<string> {
+  let out = html;
+  for (const img of inlineImages(msg)) {
+    if (!out.toLowerCase().includes(`cid:${img.cid.toLowerCase()}`)) continue;
+    const b64url = img.data ?? (img.attachmentId ? await g.attachment(id, img.attachmentId) : '');
+    const b64 = Buffer.from(b64url, 'base64url').toString('base64');
+    const url = b64 && b64.length <= MAX_EMBEDDED && /^image\/[\w.+-]+$/.test(img.mimeType) ? `data:${img.mimeType};base64,${b64}` : '';
+    out = out.replace(new RegExp(`cid:${img.cid.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi'), url);
+  }
+  return out.replace(/\bcid:[^"'\s>)]+/gi, '');
 }
 
 /** A plain device name from the browser's user agent (never trusted for anything but display). */
@@ -299,12 +314,17 @@ export function createApp(d: Deps) {
     const m = store.getMail(id);
     if (!m) return c.json({ error: 'Mail introuvable' }, 404);
     let html = m.html;
-    if (html === undefined) {
-      const g = d.gmail();
-      if (g) {
-        html = parseGmailMessage(await g.get(id)).html ?? '';
-        store.setHtml(id, html);
-      }
+    const g = d.gmail();
+    let full: Awaited<ReturnType<GmailPort['get']>> | null = null;
+    if (html === undefined && g) {
+      full = await g.get(id);
+      html = parseGmailMessage(full).html ?? '';
+      store.setHtml(id, html);
+    }
+    // Embedded images (cid:…) go right into the HTML as data: URLs, once.
+    if (html && g && /\bcid:/i.test(html)) {
+      html = await embedImages(g, id, html, full ?? (await g.get(id)));
+      store.setHtml(id, html);
     }
     return c.json({ html: html ? safeMailHtml(html) : null });
   });

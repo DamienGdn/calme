@@ -8,7 +8,17 @@ export function rawMessage(id: string, extraHeaders: Record<string, string> = {}
     internalDate: '1762851600000',
     labelIds: ['INBOX'],
     snippet: 'snip ' + id,
-    payload: id.startsWith('html')
+    payload: id.startsWith('cid')
+      ? {
+          mimeType: 'multipart/related',
+          headers: [{ name: 'From', value: 'Sophie <s@x.fr>' }, { name: 'Subject', value: 'Sujet ' + id }],
+          parts: [
+            { mimeType: 'text/html', body: { data: Buffer.from('<p>Bonjour</p><img src="cid:logo@x"><img src="cid:photo@x">').toString('base64url') } },
+            { mimeType: 'image/png', filename: 'logo.png', headers: [{ name: 'Content-ID', value: '<logo@x>' }], body: { data: Buffer.from('PNGDATA').toString('base64url') } },
+            { mimeType: 'image/jpeg', filename: 'photo.jpg', headers: [{ name: 'Content-ID', value: '<photo@x>' }], body: { attachmentId: 'att-photo', size: 7 } },
+          ],
+        }
+      : id.startsWith('html')
       ? {
           mimeType: 'multipart/alternative',
           headers: [{ name: 'From', value: 'Sophie <s@x.fr>' }, { name: 'Subject', value: 'Sujet ' + id }],
@@ -70,6 +80,10 @@ export function fakeGmail(ids: string[] = []) {
     },
     async untrash(id) {
       record('untrash', id);
+    },
+    async attachment(messageId: string, attachmentId: string) {
+      record('attachment', messageId, attachmentId);
+      return Buffer.from('JPGDATA').toString('base64url');
     },
     async send(raw, threadId) {
       record('send', raw, threadId);

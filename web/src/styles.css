@@ -574,3 +574,31 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .mail-loading { min-height: 160px; border-radius: 16px; background: var(--surf2); animation: pulse 1.4s ease-in-out infinite; }
 .mail-body a { color: var(--accent-text); overflow-wrap: anywhere; }
 @media (max-width: 720px) { .mail-paper { margin: 0 -16px; border-radius: 0; border-width: 1px 0; } }
+
+/* iPhone home-screen app: the page scrolls under the status bar, where iOS smears it; a solid band keeps it clean. */
+@media (max-width: 720px) {
+  body::after { content: ''; position: fixed; inset: 0 0 auto 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 40; pointer-events: none; }
+}
+
+/* Phone menu bar in "liquid glass": translucent, blurs what scrolls behind it, light rim and a top sheen. */
+@media (max-width: 720px) {
+  .tabbar {
+    border-radius: 28px;
+    background: color-mix(in srgb, var(--surf) 52%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.25), 0 18px 44px -16px rgba(0, 0, 0, 0.65);
+  }
+  .tabbar::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 46%);
+  }
+  .tabbar a[aria-current='page'] { border-radius: 22px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 16px -8px rgba(0, 0, 0, 0.5); }
+  [data-theme='light'] .tabbar {
+    background: color-mix(in srgb, #ffffff 46%, transparent);
+    border-color: rgba(255, 255, 255, 0.75);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.06), 0 18px 40px -18px rgba(0, 0, 0, 0.28);
+  }
+  [data-theme='light'] .tabbar::before { background: linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 50%); }
+}

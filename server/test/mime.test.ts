@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildMime, htmlToText, parseGmailMessage, parseListUnsubscribe } from '../src/mime.ts';
+import { buildMime, htmlToText, inlineImages, parseGmailMessage, parseListUnsubscribe } from '../src/mime.ts';
+import { rawMessage } from './fakeGmail.ts';
 
 const b64u = (s: string | Buffer) => Buffer.from(s).toString('base64url');
 
@@ -152,3 +153,12 @@ describe('parseGmailMessage html', () => {
   });
 });
 
+
+describe('inlineImages', () => {
+  it('lists the images a mail embeds by Content-ID (signatures, pasted pictures)', () => {
+    expect(inlineImages(rawMessage('cid1'))).toEqual([
+      { cid: 'logo@x', mimeType: 'image/png', data: Buffer.from('PNGDATA').toString('base64url'), attachmentId: null },
+      { cid: 'photo@x', mimeType: 'image/jpeg', data: null, attachmentId: 'att-photo' },
+    ]);
+  });
+});
