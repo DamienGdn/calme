@@ -6,6 +6,7 @@ import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notifyError } from '../store.ts';
 import { useMedia } from '../tabs.ts';
+import { axis } from '../gestures.ts';
 
 interface CalEvent {
   title: string;
@@ -75,8 +76,63 @@ watch(
   { immediate: true },
 );
 
-const shift = (dir: number) =>
-  (anchor.value = props.mode === 'semaine' ? addDays(anchor.value, 7 * dir) : new Date(anchor.value.getFullYear(), anchor.value.getMonth() + dir, 1));
+/** Direction of the last move, for the slide-in of the new week or month. */
+const slide = ref<'next' | 'prev' | null>(null);
+const slideKey = ref(0);
+function shift(dir: number) {
+  anchor.value = props.mode === 'semaine' ? addDays(anchor.value, 7 * dir) : new Date(anchor.value.getFullYear(), anchor.value.getMonth() + dir, 1);
+  slide.value = dir > 0 ? 'next' : 'prev';
+  slideKey.value++;
+}
+
+// Sideways scroll (trackpad, mouse) moves to the previous / next week or month; one step per gesture.
+const wrapEl = ref<HTMLElement | null>(null);
+let wheelSum = 0;
+let wheelQuietUntil = 0;
+let wheelReset = 0;
+function onWheel(e: WheelEvent) {
+  if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+  const wrap = wrapEl.value;
+  if (wrap && wrap.scrollWidth > wrap.clientWidth + 1) return; // the grid scrolls sideways itself on narrow windows
+  e.preventDefault();
+  window.clearTimeout(wheelReset);
+  wheelReset = window.setTimeout(() => (wheelSum = 0), 200);
+  if (Date.now() < wheelQuietUntil) return;
+  wheelSum += e.deltaX;
+  if (Math.abs(wheelSum) < 60) return;
+  shift(wheelSum > 0 ? 1 : -1);
+  wheelSum = 0;
+  wheelQuietUntil = Date.now() + 600;
+}
+
+// Phone: a sideways swipe does the same.
+let touch: { x: number; y: number } | null = null;
+let touchAxis: 'x' | 'y' | null = null;
+function touchDown(e: PointerEvent) {
+  if (e.pointerType !== 'touch') return;
+  touch = { x: e.clientX, y: e.clientY };
+  touchAxis = null;
+}
+function touchMove(e: PointerEvent) {
+  if (!touch) return;
+  touchAxis ??= axis(e.clientX - touch.x, e.clientY - touch.y);
+  if (touchAxis === 'y') touch = null;
+}
+function touchUp(e: PointerEvent) {
+  if (touch && touchAxis === 'x' && Math.abs(e.clientX - touch.x) > 60) shift(e.clientX < touch.x ? 1 : -1);
+  touch = null;
+}
+
+// Week grid: a ghost "+ 14:00" slot follows the pointer over free time.
+const ghost = ref<{ day: string; hour: number } | null>(null);
+function slotMove(ev: MouseEvent, d: Date) {
+  if (ev.target !== ev.currentTarget) {
+    ghost.value = null;
+    return;
+  }
+  const hour = Math.min(DAY_END - 1, DAY_START + Math.floor(ev.offsetY / HOUR_PX));
+  if (ghost.value?.day !== key(d) || ghost.value.hour !== hour) ghost.value = { day: key(d), hour };
+}
 const title = computed(() =>
   props.mode === 'semaine'
     ? t('agenda.cal.weekOf', { date: days.value[0].toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' }) })
@@ -122,7 +178,7 @@ function place(e: Item) {
 </script>
 
 <template>
-  <section class="cal" :aria-label="title">
+  <section class="cal" :aria-label="title" @wheel="onWheel" @pointerdown="touchDown" @pointermove="touchMove" @pointerup="touchUp" @pointercancel="touch = null">
     <div class="cal-head">
       <button type="button" class="btn btn-icon" :aria-label="mode === 'semaine' ? t('agenda.cal.prevWeek') : t('agenda.cal.prevMonth')" @click="shift(-1)"><Icon name="back" :size="16" /></button>
       <button type="button" class="btn" @click="anchor = new Date()">{{ t('common.today') }}</button>
@@ -133,7 +189,7 @@ function place(e: Item) {
       <span v-if="!events" class="muted" style="font-size: 13px">{{ t('common.loading') }}</span>
     </div>
 
-    <div v-if="mode === 'mois'" class="month">
+    <div v-if="mode === 'mois'" :key="'m' + slideKey" :class="['month', slide && `slide-${slide}`]">
       <span v-for="w in weekdays" :key="w" class="month-wd mono">{{ w }}</span>
       <button
         v-for="d in days"
@@ -162,7 +218,7 @@ function place(e: Item) {
     </div>
 
     <!-- Phone: the diary. Month: the day tapped in the grid. Week: one page per day. -->
-    <div v-if="phone" class="timeline carnet">
+    <div v-if="phone" :key="'c' + slideKey" :class="['timeline carnet', mode === 'semaine' && slide && `slide-${slide}`]">
       <div v-for="k in mode === 'mois' ? [sel] : days.map(key)" :key="k" :class="['tl-day', { today: k === today }]">
         <div class="tl-date">
           <span class="tl-n">{{ fromKey(k).getDate() }}</span>
@@ -190,7 +246,7 @@ function place(e: Item) {
       </div>
     </div>
 
-    <div v-else-if="!phone" class="week-wrap">
+    <div v-else-if="mode === 'semaine'" ref="wrapEl" :key="'w' + slideKey" :class="['week-wrap', slide && `slide-${slide}`]">
       <div class="week" :style="{ gridTemplateRows: `auto auto ${(DAY_END - DAY_START) * HOUR_PX}px` }">
         <span />
         <span v-for="d in days" :key="'h' + key(d)" :class="['week-day', { today: key(d) === today }]">
@@ -203,7 +259,18 @@ function place(e: Item) {
         <div class="week-hours">
           <span v-for="h in DAY_END - DAY_START" :key="h" class="mono" :style="{ height: `${HOUR_PX}px` }">{{ String(DAY_START + h - 1).padStart(2, '0') }}h</span>
         </div>
-        <div v-for="d in days" :key="'c' + key(d)" :class="['week-col', { today: key(d) === today }]" :title="t('agenda.addHere')" @click="slotClick($event, d)" :style="{ backgroundSize: `100% ${HOUR_PX}px` }">
+        <div
+          v-for="d in days"
+          :key="'c' + key(d)"
+          :class="['week-col', { today: key(d) === today }]"
+          :style="{ backgroundSize: `100% ${HOUR_PX}px` }"
+          @click="slotClick($event, d)"
+          @mousemove="slotMove($event, d)"
+          @mouseleave="ghost = null"
+        >
+          <span v-if="ghost && ghost.day === key(d)" class="slot-ghost" aria-hidden="true" :style="{ top: `${(ghost.hour - DAY_START) * HOUR_PX + 1}px`, height: `${HOUR_PX - 2}px` }">
+            + {{ String(ghost.hour).padStart(2, '0') }}:00
+          </span>
           <span v-for="(e, i) in timed(d)" :key="i" :class="['week-ev', e.kind]" :style="{ ...place(e), ...(e.calendar ? { '--cal': e.calendar.color } : {}) }" @click="emit('open', e)" :title="`${hm(e.start)}–${hm(e.end)} · ${e.title}`">
             <span class="mono">{{ hm(e.start) }}</span>
             <span>{{ e.title }}</span>
