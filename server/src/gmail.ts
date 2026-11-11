@@ -20,6 +20,8 @@ export interface GmailPort {
   modify(id: string, add: string[], remove: string[]): Promise<void>;
   trash(id: string): Promise<void>;
   untrash(id: string): Promise<void>;
+  /** The signature set in Gmail for the main address (HTML). */
+  signature(): Promise<string>;
   /** An attachment's bytes, base64url-encoded. */
   attachment(messageId: string, attachmentId: string): Promise<string>;
   send(raw: string, threadId?: string): Promise<void>;
@@ -162,6 +164,11 @@ export function createGmailPort(auth: OAuth2Client, background = false): GmailPo
     },
     async untrash(id) {
       await call(COST.untrash, () => users.messages.untrash({ userId: 'me', id }));
+    },
+    async signature() {
+      const res = await call(COST.list, () => users.settings.sendAs.list({ userId: 'me' }));
+      const all = res.data.sendAs ?? [];
+      return (all.find((a) => a.isPrimary) ?? all.find((a) => a.isDefault) ?? all[0])?.signature ?? '';
     },
     async attachment(messageId, id) {
       return (await call(COST.attachment, () => users.messages.attachments.get({ userId: 'me', messageId, id }))).data.data ?? '';

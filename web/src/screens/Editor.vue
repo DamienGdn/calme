@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { post, useMailBody, when } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import RecipientField from '../components/RecipientField.vue';
+import { richText } from '../format.ts';
 import { dateLocale } from '../i18n.ts';
 import { draft, goTo, notify, notifyError, refresh, store } from '../store.ts';
 
@@ -21,13 +22,44 @@ const mail = computed(() => store.state?.emails.find((m) => m.id === d.mailId) ?
 const to = ref(mail.value?.fromEmail ?? '');
 const cc = ref('');
 const subject = ref(mail.value ? (/^re\s*:/i.test(mail.value.subject) ? mail.value.subject : `Re: ${mail.value.subject}`) : '');
-const body = ref(d.text ?? '');
+/** With a signature on, the "[Prénom]" placeholder Calm's drafts end with is not needed. */
+const unsign = (text: string) => (store.state?.signature ? text.replace(/\s*\[(?:Prénom|First name)\]\s*$/, '') : text);
+const body = ref(unsign(d.text ?? ''));
+const signature = computed(() => richText(store.state?.signature ?? ''));
 const tone = ref<Tone | null>(null);
 const ask = ref('');
 const brief = ref('');
 const files = ref<File[]>([]);
 const over = ref(false);
-const busy = ref<'' | 'rewrite' | 'send' | 'slots'>('');
+const busy = ref<'' | 'rewrite' | 'send' | 'slots' | 'questions'>('');
+
+/** Calm's questions on what the draft leaves unknown; the answers rewrite the reply. */
+const questions = ref<{ question: string; suggestions: string[]; answer: string }[] | null>(null);
+async function askQuestions() {
+  if (!mail.value || !body.value.trim()) return;
+  busy.value = 'questions';
+  try {
+    const r = await post<{ questions: { question: string; suggestions: string[] }[] }>('/api/reply/questions', { mailId: mail.value.id, draft: body.value });
+    if (!r.questions.length) {
+      questions.value = null;
+      notify(t('editor.noQuestion'));
+    } else questions.value = r.questions.map((q) => ({ ...q, answer: '' }));
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    busy.value = '';
+  }
+}
+async function applyAnswers() {
+  const answered = (questions.value ?? []).filter((q) => q.answer.trim());
+  if (!answered.length) return;
+  const instruction = [
+    'Intègre ces précisions de l’utilisateur dans la réponse et retire les éléments entre crochets qu’elles remplacent :',
+    ...answered.map((q) => `- ${q.question} → ${q.answer.trim()}`),
+  ].join('\n');
+  await rewrite(null, instruction);
+  questions.value = null;
+}
 const slots = ref<Slot[] | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const original = useMailBody(toRef(() => mail.value?.id));
@@ -52,7 +84,7 @@ async function rewrite(tn: Tone | null, instruction?: string) {
   busy.value = 'rewrite';
   try {
     const r = await post<{ draft: string }>('/api/redraft', { mailId: mail.value.id, draft: body.value, tone: tn ?? tone.value ?? 'neutral', instruction });
-    body.value = r.draft;
+    body.value = unsign(r.draft);
     if (tn) tone.value = tn;
     ask.value = '';
   } catch (e) {
@@ -62,12 +94,28 @@ async function rewrite(tn: Tone | null, instruction?: string) {
   }
 }
 
+/** Last subject Calm wrote: it may replace it again, but never one typed by hand. */
+const autoSubject = ref<string | null>(null);
+const suggesting = ref(false);
+async function suggestSubject() {
+  suggesting.value = true;
+  try {
+    const r = await post<{ subject: string }>('/api/subject', { body: body.value });
+    if (r.subject) subject.value = autoSubject.value = r.subject;
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    suggesting.value = false;
+  }
+}
+
 async function compose() {
   busy.value = 'rewrite';
   try {
     const r = await post<{ subject: string; body: string }>('/api/compose', { to: to.value, brief: brief.value, tone: tone.value ?? 'neutral' });
-    body.value = r.body;
-    if (!subject.value.trim() && r.subject) subject.value = r.subject;
+    body.value = unsign(r.body);
+    // Calm fills the subject, and keeps it up to date while it is still its own (not edited by hand).
+    if (r.subject && (!subject.value.trim() || subject.value === autoSubject.value)) subject.value = autoSubject.value = r.subject;
   } catch (e) {
     notifyError(e);
   } finally {
@@ -81,7 +129,7 @@ async function proposeSlots() {
   try {
     const r = await post<{ slots: Slot[]; draft: string }>(`/api/mail/${encodeURIComponent(mail.value.id)}/slots`);
     slots.value = r.slots;
-    if (r.draft) body.value = r.draft;
+    if (r.draft) body.value = unsign(r.draft);
     if (!r.slots.length) notify(t('editor.noSlots'), true);
   } catch (e) {
     notifyError(e);
@@ -149,6 +197,9 @@ function onDrop(e: DragEvent) {
         <label class="line" style="min-height: 64px">
           <span class="eyebrow">{{ t('editor.subject') }}</span>
           <input v-model="subject" class="subject-input" />
+          <button v-if="!subject.trim() && body.trim().length > 20" type="button" class="linkish suggest-subject" :disabled="suggesting" @click="suggestSubject">
+            {{ suggesting ? t('editor.thinking') : t('editor.suggestSubject') }}
+          </button>
         </label>
       </div>
 
@@ -172,6 +223,9 @@ function onDrop(e: DragEvent) {
         <button v-if="mail" type="button" class="btn" :disabled="busy !== ''" @click="proposeSlots">
           <Icon name="calendar" :size="16" /> {{ busy === 'slots' ? t('editor.lookingAgenda') : t('reader.suggestSlots') }}
         </button>
+        <button v-if="mail" type="button" class="btn" :disabled="busy !== '' || !body.trim()" @click="askQuestions">
+          <Icon name="search" :size="16" /> {{ busy === 'questions' ? t('editor.thinking') : t('editor.refine') }}
+        </button>
         <div v-if="mail" class="tones" role="radiogroup" :aria-label="t('editor.tone')">
           <button v-for="tn in TONES" :key="tn" type="button" role="radio" :aria-checked="tone === tn" :disabled="busy !== ''" @click="rewrite(tn)">{{ t(`editor.tones.${tn}`) }}</button>
         </div>
@@ -187,8 +241,28 @@ function onDrop(e: DragEvent) {
             <span v-for="s in slots" :key="s.start" class="slot">{{ slotLabel(s) }}</span>
           </div>
         </div>
+        <form v-if="questions" class="qa-panel" @submit.prevent="applyAnswers">
+          <span class="eyebrow" style="display: flex; align-items: center; gap: 8px"><span class="dot" /> {{ t('editor.questionsTitle') }}</span>
+          <div v-for="(q, i) in questions" :key="i" class="qa">
+            <label :for="`qa-${i}`">{{ q.question }}</label>
+            <div v-if="q.suggestions.length" class="qa-sugg">
+              <button v-for="s in q.suggestions" :key="s" type="button" :aria-pressed="q.answer === s" @click="q.answer = s">{{ s }}</button>
+            </div>
+            <input :id="`qa-${i}`" v-model="q.answer" class="field-input" autocomplete="off" :placeholder="t('editor.yourAnswer')" />
+          </div>
+          <span style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button class="btn btn-prim" :disabled="busy !== '' || !questions.some((q) => q.answer.trim())">{{ busy === 'rewrite' ? t('editor.rewriting') : t('editor.applyAnswers') }}</button>
+            <button type="button" class="btn" @click="questions = null">{{ t('common.close') }}</button>
+          </span>
+        </form>
         <label class="sr" for="body">{{ t('editor.message') }}</label>
         <textarea id="body" v-model="body" :placeholder="t('editor.bodyPlaceholder')" :aria-busy="busy === 'rewrite'" />
+        <p class="format-hint muted">{{ t('editor.formatHint') }}</p>
+        <div v-if="signature.length" class="sig-preview" :aria-label="t('signature.title')">
+          <span class="mono">--</span>
+          <p v-for="(para, i) in signature" :key="i"><template v-for="(s, j) in para" :key="j"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template></p>
+          <a href="#/admin" class="muted">{{ t('signature.edit') }}</a>
+        </div>
       </div>
 
       <div style="padding: 8px 24px 20px; display: flex; flex-wrap: wrap; gap: 10px">

@@ -9,6 +9,7 @@ import type { GmailPort } from '../src/gmail.ts';
 import { openStore } from '../src/store.ts';
 import { fakeGmail } from './fakeGmail.ts';
 import { mail } from './fixtures.ts';
+import { part } from './mimeParts.ts';
 
 const TOKEN = 'secret-token';
 const cfg: Config = {
@@ -43,7 +44,11 @@ function setup(gmailConnected = true) {
     gmail: () => (gmailConnected ? (g.port as GmailPort) : null),
     oauth: { hasCredentials: () => true, isConnected: () => gmailConnected, authUrl: () => 'https://accounts', exchange: async () => {}, saveCredentials: (raw: unknown) => saved.push(raw) },
     runner: async (i) =>
-      JSON.stringify(i.schema).includes('"body"')
+      JSON.stringify(i.schema).includes('"subject"') && !JSON.stringify(i.schema).includes('"body"')
+        ? { subject: 'Retard samedi soir' }
+        : JSON.stringify(i.schema).includes('"questions"')
+        ? { questions: [{ question: 'À quelle heure arrives-tu ?', suggestions: ['19h', '20h', '20h30'] }, { question: '', suggestions: [] }] }
+        : JSON.stringify(i.schema).includes('"body"')
         ? { subject: 'Petit retard', body: 'Coucou Sophie, j’aurai 10 minutes de retard. [Prénom]' }
         : JSON.stringify(i.schema).includes('gmailQuery')
         ? { gmailQuery: 'from:syndic AG', explanation: 'Mails du syndic sur l’AG', keywords: ['syndic', 'AG'] }
@@ -495,7 +500,7 @@ describe('api admin', () => {
     const body = await (await app.request('/api/admin', { headers: auth })).json();
     expect(body.claude).toEqual({ installed: true, version: '2.1.322 (Claude Code)' });
     expect(body.google.connected).toBe(true);
-    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, model: 'haiku', intervalMin: 5 });
+    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, model: 'haiku', intervalMin: 5 });
   });
 
   it('validates and saves settings', async () => {
@@ -779,5 +784,72 @@ describe('delete an appointment', () => {
     expect((await del(app, 'feries-id', 'ev1')).status).toBe(400);
     expect((await del(app, 'inconnu', 'ev1')).status).toBe(400);
     expect(created.some((c) => 'removed' in (c as object))).toBe(false);
+  });
+});
+
+describe('email signature', () => {
+  const save = (app: ReturnType<typeof setup>['app'], b: unknown) =>
+    app.request('/api/admin/settings', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+  const send = (app: ReturnType<typeof setup>['app'], body: string) => {
+    const form = new FormData();
+    form.set('to', 's@x.fr');
+    form.set('subject', 'Bonjour');
+    form.set('body', body);
+    return app.request('/api/reply', { method: 'POST', headers: auth, body: form });
+  };
+  const sentRaw = (g: ReturnType<typeof setup>['g']) => Buffer.from(g.calls.filter((c) => c.method === 'send').at(-1)?.args[0] as string, 'base64url').toString();
+
+  it('adds the signature in place of the [Prénom] placeholder when it is on', async () => {
+    const { app, g } = setup();
+    expect((await save(app, { signature: 'Damien\n**Calm.** · https://calm.example', signatureOn: true })).status).toBe(200);
+    expect((await send(app, 'Avec plaisir !\n\nÀ bientôt,\n[Prénom]')).status).toBe(200);
+    const raw = sentRaw(g);
+    expect(part(raw, 'text/plain')).toBe('Avec plaisir !\n\nÀ bientôt,\n\n-- \nDamien\nCalm. · https://calm.example');
+    expect(part(raw, 'text/html')).toContain('<strong>Calm.</strong>');
+  });
+
+  it('leaves the message alone when the signature is off', async () => {
+    const { app, g } = setup();
+    await save(app, { signature: 'Damien', signatureOn: false });
+    await send(app, 'Merci\n[Prénom]');
+    expect(part(sentRaw(g), 'text/plain')).toBe('Merci\n[Prénom]');
+  });
+
+  it('imports the Gmail signature as text', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/signature/gmail', { headers: auth })).json();
+    expect(r.text).toBe('Damien Guesdon\n**Calm.**');
+  });
+});
+
+describe('questions to refine a reply', () => {
+  const ask = (app: ReturnType<typeof setup>['app'], b: unknown) =>
+    app.request('/api/reply/questions', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+
+  it('asks what the draft leaves unknown, with suggested answers', async () => {
+    const { app } = setup();
+    const r = await (await ask(app, { mailId: 'a', draft: 'Avec plaisir, j’arrive vers [heure].' })).json();
+    expect(r.questions).toEqual([{ question: 'À quelle heure arrives-tu ?', suggestions: ['19h', '20h', '20h30'] }]);
+  });
+
+  it('needs a draft and a known mail', async () => {
+    const { app } = setup();
+    expect((await ask(app, { mailId: 'a', draft: '  ' })).status).toBe(400);
+    expect((await ask(app, { mailId: 'zzz', draft: 'x' })).status).toBe(404);
+  });
+});
+
+describe('subject suggestion', () => {
+  const ask = (app: ReturnType<typeof setup>['app'], b: unknown) =>
+    app.request('/api/subject', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+
+  it('suggests a subject from the message', async () => {
+    const { app } = setup();
+    expect(await (await ask(app, { body: 'Coucou Sophie, j’aurai 10 minutes de retard samedi soir.' })).json()).toEqual({ subject: 'Retard samedi soir' });
+  });
+
+  it('needs some text', async () => {
+    const { app } = setup();
+    expect((await ask(app, { body: ' ' })).status).toBe(400);
   });
 });

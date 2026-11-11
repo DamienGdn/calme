@@ -81,6 +81,10 @@ export function fakeGmail(ids: string[] = []) {
     async untrash(id) {
       record('untrash', id);
     },
+    async signature() {
+      record('signature');
+      return '<div dir="ltr">Damien Guesdon<br><b>Calm.</b></div>';
+    },
     async attachment(messageId: string, attachmentId: string) {
       record('attachment', messageId, attachmentId);
       return Buffer.from('JPGDATA').toString('base64url');

@@ -856,3 +856,40 @@ html { font-optical-sizing: auto; }
 /* Full date and time of the opened mail. */
 .mail-date { display: block; font-size: 13px; color: var(--muted); }
 .mail-date::first-letter { text-transform: uppercase; }
+
+/* Signature (Admin card, editor) and formatted proposed replies. */
+.sig-edit { display: flex; flex-direction: column; gap: 6px; }
+.sig-preview { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 12px; border-left: 2px solid var(--line); background: var(--surf2); font-size: 14px; line-height: 1.5; color: var(--body); }
+.sig-preview p { margin: 0; white-space: pre-line; }
+.sig-preview .mono { color: var(--muted); font-size: 12px; }
+.sig-preview a { font-size: 12px; align-self: flex-start; }
+.letter .sig-preview { margin: 0 24px 4px; }
+.format-hint { margin: 4px 24px 10px; font-size: 12px; }
+.reply-card .q { display: flex; flex-direction: column; gap: 6px; font-family: inherit; font-size: 14px; line-height: 1.5; color: var(--body); }
+.reply-card .q-p { display: block; white-space: pre-line; }
+.reply-card .q strong { color: var(--ink); font-weight: 600; }
+.reply-card .q { max-height: 9em; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent); mask-image: linear-gradient(180deg, #000 70%, transparent); }
+
+/* Calm's questions on a reply draft. */
+.qa-panel { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 16px; background: var(--surf2); border: 1px solid var(--sel-border); }
+.qa { display: flex; flex-direction: column; gap: 8px; }
+.qa label { font-size: 15px; font-weight: 500; color: var(--ink); }
+.qa-sugg { display: flex; flex-wrap: wrap; gap: 6px; }
+.qa-sugg button { min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surf); color: var(--ink); font-size: 13px; }
+.qa-sugg button[aria-pressed='true'] { background: var(--prim-bg); color: var(--prim-fg); border-color: transparent; font-weight: 600; }
+.qa .field-input { background: var(--surf); }
+
+.suggest-subject { flex: none; color: var(--accent-text); font-weight: 600; text-decoration: none; white-space: nowrap; }
+
+/* Contact suggestions: the address never overflows; on the phone name and count on one line, the address below. */
+.suggest { max-height: min(360px, 50vh); overflow-y: auto; overscroll-behavior: contain; }
+.suggest li { min-width: 0; }
+.suggest li > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 720px) {
+  .suggest { left: 0; }
+  .suggest li { flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; padding: 9px 10px; }
+  .suggest li > span:first-child { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .suggest li > span:nth-child(2) { order: 3; flex: 1 1 100%; }
+  .suggest li > span:last-child { margin-left: 0 !important; }
+}
+.recipients .chips { cursor: text; }

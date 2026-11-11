@@ -6,6 +6,7 @@ import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
 import MailBody from '../components/MailBody.vue';
+import { richText } from '../format.ts';
 import UnsubBar from './UnsubBar.vue';
 
 const props = defineProps<{ mail: MailItem; busy: boolean }>();
@@ -109,7 +110,11 @@ function eventDate(start: string, end: string) {
             <span style="flex: 1; font-size: 13px; font-weight: 600">{{ r.label }}</span>
             <span v-if="i === 0" class="chip">{{ t('reader.advised') }}</span>
           </span>
-          <span class="q">« {{ r.text }} »</span>
+          <span class="q">
+            <span v-for="(para, k) in richText(r.text)" :key="k" class="q-p">
+              <template v-for="(s, j) in para" :key="j"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template>
+            </span>
+          </span>
           <span class="muted" style="margin-top: auto; font-size: 12px">{{ t('reader.reviewSend') }}</span>
         </button>
       </div>

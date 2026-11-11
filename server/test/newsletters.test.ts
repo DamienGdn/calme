@@ -28,7 +28,7 @@ describe('scanNewsletters', () => {
 describe('settings', () => {
   it('defaults to no automatic unsubscribe', () => {
     const s = openStore(':memory:');
-    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 })).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, model: 'sonnet', intervalMin: 5 });
+    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 })).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, model: 'sonnet', intervalMin: 5 });
   });
   it('rejects invalid values', () => {
     const s = openStore(':memory:');

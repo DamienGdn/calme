@@ -22,6 +22,9 @@ export interface Settings {
   quietEnd: number | null;
   /** Load the images of formatted mails (some senders use them to know a mail was opened). */
   remoteImages: boolean;
+  /** Email signature, in Calm's light markup (lines, **bold**, links), and whether it is added when sending. */
+  signature: string;
+  signatureOn: boolean;
   model: string;
   intervalMin: number;
 }
@@ -29,7 +32,7 @@ export interface Settings {
 /** User-editable settings (admin page), stored in the database; env/config values are the defaults. */
 export function getSettings(s: Store, defaults: { model: string; intervalMin: number }): Settings {
   const saved = JSON.parse(s.getMeta('settings') ?? '{}') as Partial<Settings>;
-  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, ...defaults, ...saved };
+  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, ...defaults, ...saved };
 }
 
 export function saveSettings(s: Store, patch: Partial<Settings>): void {
@@ -63,6 +66,8 @@ export function saveSettings(s: Store, patch: Partial<Settings>): void {
   }
   if (patch.autoUnsubscribe !== undefined) next.autoUnsubscribe = Boolean(patch.autoUnsubscribe);
   if (patch.remoteImages !== undefined) next.remoteImages = Boolean(patch.remoteImages);
+  if (patch.signature !== undefined) next.signature = String(patch.signature).replace(/\r\n/g, '\n').slice(0, 2000);
+  if (patch.signatureOn !== undefined) next.signatureOn = Boolean(patch.signatureOn);
   if (patch.keepSenders !== undefined) {
     if (!Array.isArray(patch.keepSenders)) throw new Error('keepSenders doit être une liste');
     next.keepSenders = [...new Set(patch.keepSenders.map((e) => String(e).trim().toLowerCase()).filter(Boolean))];

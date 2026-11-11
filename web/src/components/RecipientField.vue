@@ -47,6 +47,15 @@ function add(email: string, name?: string) {
   if (name) names.set(e, name);
   model.value = [...chips.value, e].join(', ');
   text.value = '';
+  // A person was picked: the list closes; tapping the field again (or typing) brings it back.
+  open.value = false;
+}
+const inputEl = ref<HTMLInputElement | null>(null);
+/** A tap on the empty part of the field focuses it and shows the suggestions again. */
+function reopen(e: MouseEvent) {
+  if ((e.target as HTMLElement).closest('.rchip')) return;
+  inputEl.value?.focus();
+  open.value = true;
 }
 const removeChip = (c: string) => (model.value = chips.value.filter((x) => x !== c).join(', '));
 
@@ -80,13 +89,14 @@ function onBlur() {
 <template>
   <div class="line recipients">
     <label class="eyebrow" :for="id">{{ props.label }}</label>
-    <div class="chips">
+    <div class="chips" @click="reopen">
       <span v-for="c in chips" :key="c" class="rchip" :title="c">
         {{ names.get(c) ?? c }}
         <button type="button" :aria-label="t('common.remove', { name: c })" @click="removeChip(c)">×</button>
       </span>
       <input
         :id="id"
+        ref="inputEl"
         v-model="text"
         role="combobox"
         :aria-expanded="open && list.length > 0"

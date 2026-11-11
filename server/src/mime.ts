@@ -167,8 +167,30 @@ function safe(value: string): string {
   return value;
 }
 
+const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const BOLD = /\*\*([^*\n]+?)\*\*/g;
+
+/**
+ * Calm's light markup (paragraphs separated by a blank line, **bold**, bare links) as the two versions of a mail:
+ * plain text without the stars, and HTML where every character of the text is escaped first.
+ */
+export function formatBody(src: string): { text: string; html: string } {
+  const body = src.replace(/\r\n/g, '\n');
+  const text = body.replace(BOLD, '$1');
+  const inline = (p: string) =>
+    escHtml(p)
+      .replace(BOLD, '<strong>$1</strong>')
+      .replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]]/g, (u) => `<a href="${u}">${u}</a>`)
+      .replace(/\n/g, '<br>');
+  const paras = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1b1b1f">${paras.map((p) => `<p>${inline(p)}</p>`).join('')}</div>`;
+  return { text, html };
+}
+
 export function buildMime(o: OutgoingMail): string {
   const boundary = 'calme-' + randomBytes(12).toString('hex');
+  const alt = 'calme-alt-' + randomBytes(12).toString('hex');
+  const { text, html } = formatBody(o.body);
   const headers = [
     `From: ${safe(o.from)}`,
     `To: ${safe(o.to)}`,
@@ -183,10 +205,19 @@ export function buildMime(o: OutgoingMail): string {
     ...headers,
     '',
     `--${boundary}`,
+    `Content-Type: multipart/alternative; boundary="${alt}"`,
+    '',
+    `--${alt}`,
     'Content-Type: text/plain; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
-    wrap76(Buffer.from(o.body).toString('base64')),
+    wrap76(Buffer.from(text).toString('base64')),
+    `--${alt}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    wrap76(Buffer.from(html).toString('base64')),
+    `--${alt}--`,
   ];
   for (const a of o.attachments) {
     const name = encodeURIComponent(safe(a.filename));

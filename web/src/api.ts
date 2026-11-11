@@ -18,6 +18,8 @@ export interface AppState {
   language?: 'fr' | 'en';
   /** Load the images of formatted mails (Admin › App). */
   remoteImages?: boolean;
+  /** Signature added when sending ('' when off). */
+  signature?: string;
   setupDone?: boolean;
 }
 

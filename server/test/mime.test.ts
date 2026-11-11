@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildMime, htmlToText, inlineImages, parseGmailMessage, parseListUnsubscribe } from '../src/mime.ts';
+import { buildMime, formatBody, htmlToText, inlineImages, parseGmailMessage, parseListUnsubscribe } from '../src/mime.ts';
 import { rawMessage } from './fakeGmail.ts';
+import { part } from './mimeParts.ts';
 
 const b64u = (s: string | Buffer) => Buffer.from(s).toString('base64url');
 
@@ -160,5 +161,28 @@ describe('inlineImages', () => {
       { cid: 'logo@x', mimeType: 'image/png', data: Buffer.from('PNGDATA').toString('base64url'), attachmentId: null },
       { cid: 'photo@x', mimeType: 'image/jpeg', data: null, attachmentId: 'att-photo' },
     ]);
+  });
+});
+
+describe('formatted mail', () => {
+  it('turns Calm’s light markup into HTML: paragraphs, line breaks, bold, links', () => {
+    const { html, text } = formatBody('Bonjour Sophie,\n\nRendez-vous **jeudi 10h**.\nPlan : https://exemple.fr/plan\n\nBelle journée');
+    expect(html).toContain('<p>Bonjour Sophie,</p>');
+    expect(html).toContain('<strong>jeudi 10h</strong>');
+    expect(html).toContain('<br>');
+    expect(html).toContain('<a href="https://exemple.fr/plan">https://exemple.fr/plan</a>');
+    expect(text).toBe('Bonjour Sophie,\n\nRendez-vous jeudi 10h.\nPlan : https://exemple.fr/plan\n\nBelle journée');
+  });
+
+  it('escapes anything that looks like HTML', () => {
+    const { html } = formatBody('<script>x()</script> & <b>moi</b>');
+    expect(html).toContain('&lt;script&gt;x()&lt;/script&gt; &amp; &lt;b&gt;moi&lt;/b&gt;');
+  });
+
+  it('sends a plain-text and an HTML version of the same message', () => {
+    const raw = Buffer.from(buildMime({ from: 'moi@x.fr', to: 'a@x.fr', subject: 'S', body: 'Salut **toi**', attachments: [] }), 'base64url').toString();
+    expect(raw).toContain('multipart/alternative');
+    expect(part(raw, 'text/plain')).toBe('Salut toi');
+    expect(part(raw, 'text/html')).toContain('Salut <strong>toi</strong>');
   });
 });

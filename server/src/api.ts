@@ -10,11 +10,11 @@ import { GmailDisconnected, type GmailPort } from './gmail.ts';
 import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
 import { safeMailHtml } from './mailHtml.ts';
-import { decodeEntities, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
+import { decodeEntities, htmlToText, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
-import { proposeSlots, redraft, type Tone } from './triage.ts';
+import { draftQuestions, proposeSlots, redraft, suggestSubject, type Tone } from './triage.ts';
 import { searchMail } from './search.ts';
 import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts';
 import type { Archive } from './archive.ts';
@@ -219,6 +219,7 @@ export function createApp(d: Deps) {
       analyzing: store.countUnanalyzed(),
       language: getSettings(store, defaults()).language,
       remoteImages: getSettings(store, defaults()).remoteImages,
+      signature: getSettings(store, defaults()).signatureOn ? getSettings(store, defaults()).signature : '',
       setupDone: store.getMeta('setupDone') === '1',
       running: st.running,
       error: st.error,
@@ -397,7 +398,7 @@ export function createApp(d: Deps) {
           to: field('to'),
           cc: field('cc'),
           subject: field('subject'),
-          body: field('body'),
+          body: signed(field('body')),
           attachments: await Promise.all(
             files.map(async (f) => ({ filename: f.name, mimeType: f.type || 'application/octet-stream', data: Buffer.from(await f.arrayBuffer()) })),
           ),
@@ -407,6 +408,37 @@ export function createApp(d: Deps) {
       return c.json({ ok: true });
     },
   );
+
+  // The signature (Admin › Signature), when on, takes the place of the "[Prénom]" placeholder Calm's drafts end with.
+  const signed = (body: string) => {
+    const { signature, signatureOn } = getSettings(store, defaults());
+    if (!signatureOn || !signature.trim()) return body;
+    return `${body.replace(/\s*\[(?:Prénom|First name)\]\s*$/, '').trimEnd()}\n\n-- \n${signature.trim()}`;
+  };
+
+  // Imports the signature set in Gmail, as Calm's light markup (bold kept, lines kept).
+  app.get('/api/signature/gmail', async (c) => {
+    const html = await gmail().signature();
+    const marked = html.replace(/<(b|strong)\b[^>]*>([\s\S]*?)<\/\1>/gi, '**$2**');
+    return c.json({ text: htmlToText(marked).trim() });
+  });
+
+  // Questions on what a reply draft leaves unknown; the answers then go to /api/redraft as an instruction.
+  app.post('/api/reply/questions', async (c) => {
+    const b = await c.req.json<{ mailId?: string; draft?: string }>();
+    const draft = String(b.draft ?? '').trim();
+    if (!draft) return c.json({ error: 'Brouillon vide' }, 400);
+    const mail = store.getMail(String(b.mailId ?? ''));
+    if (!mail) return c.json({ error: 'Mail introuvable' }, 404);
+    return c.json({ questions: await draftQuestions(d.runner, { mail, draft: draft.slice(0, 8000) }) });
+  });
+
+  app.post('/api/subject', async (c) => {
+    const { body } = await c.req.json<{ body?: string }>();
+    const text = String(body ?? '').trim();
+    if (!text) return c.json({ error: 'Message vide' }, 400);
+    return c.json({ subject: await suggestSubject(d.runner, text.slice(0, 6000)) });
+  });
 
   app.post('/api/redraft', async (c) => {
     const b = await c.req.json<{ mailId: string; draft: string; tone: Tone; instruction?: string }>();
