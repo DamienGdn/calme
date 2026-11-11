@@ -59,6 +59,9 @@ export function fakeGmail(ids: string[] = []) {
     async trash(id) {
       record('trash', id);
     },
+    async untrash(id) {
+      record('untrash', id);
+    },
     async send(raw, threadId) {
       record('send', raw, threadId);
     },

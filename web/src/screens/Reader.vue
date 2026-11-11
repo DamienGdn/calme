@@ -42,19 +42,13 @@ function eventDate(start: string, end: string) {
 
 <template>
   <article class="reader rise" :aria-label="t('reader.label')">
-    <button type="button" class="btn back" style="align-self: flex-start" @click="emit('back')"><Icon name="back" :size="16" /> {{ t('common.back') }}</button>
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
-      <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
-        <span class="eyebrow" style="display: flex; align-items: center; gap: 8px; font-size: 12px">
-          <span aria-hidden="true" :style="{ width: '8px', height: '8px', borderRadius: '2px', background: a ? CAT_COLOR[a.category] : 'var(--line)' }" />
-          {{ a ? t(`cat.${a.category}`) : t('cat.untriaged') }} · {{ when(mail.date) }}
-        </span>
-        <h2>{{ mail.subject || t('common.noSubject') }}</h2>
-        <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">
-          {{ mail.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ mail.fromEmail }}&gt;</span>
-        </span>
-      </div>
-      <div class="actions" style="position: relative">
+    <div class="reader-top">
+      <button type="button" class="btn back" @click="emit('back')"><Icon name="back" :size="16" /> {{ t('common.back') }}</button>
+      <span class="eyebrow" style="display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0">
+        <span aria-hidden="true" :style="{ flex: 'none', width: '8px', height: '8px', borderRadius: '2px', background: a ? CAT_COLOR[a.category] : 'var(--line)' }" />
+        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ a ? t(`cat.${a.category}`) : t('cat.untriaged') }} · {{ when(mail.date) }}</span>
+      </span>
+      <div class="actions">
         <button type="button" class="btn btn-icon" :aria-label="t('reader.archive')" :title="t('reader.archive')" :disabled="busy" @click="emit('archive')"><Icon name="archive" :size="18" /></button>
         <button type="button" class="btn btn-icon" :aria-label="t('reader.file')" :title="t('reader.file')" :aria-expanded="menu" :disabled="busy" @click="openMenu"><Icon name="folder" :size="18" /></button>
         <button type="button" class="btn btn-icon btn-danger" :aria-label="t('reader.trash')" aria-keyshortcuts="Enter" :title="t('reader.trashHint')" :disabled="busy" @click="emit('trash')"><Icon name="trash" :size="18" /></button>
@@ -64,6 +58,12 @@ function eventDate(start: string, end: string) {
           <button v-for="l in labels ?? []" :key="l.id" type="button" role="menuitem" @click="menu = false; emit('label', l.id, l.name)">{{ l.name }}</button>
         </div>
       </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+      <h2>{{ mail.subject || t('common.noSubject') }}</h2>
+      <span class="muted" style="font-size: 14px; overflow-wrap: anywhere">
+        {{ mail.fromName }} <span class="mono" style="font-size: 12px">&lt;{{ mail.fromEmail }}&gt;</span>
+      </span>
     </div>
 
     <section v-if="a" class="claude-box" :aria-label="t('reader.calmeRead')">

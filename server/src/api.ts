@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
-import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, trash, unsubscribe } from './actions.ts';
+import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, trash, unsubscribe, untrash } from './actions.ts';
 import { conflictWith, formatAgenda, ISO_DATETIME, localIso, type CalendarPort } from './calendar.ts';
 import type { ClaudeRunner } from './claude.ts';
 import type { Config } from './config.ts';
@@ -68,6 +68,11 @@ function sameSecret(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** A plain device name from the browser's user agent (never trusted for anything but display). */
+function deviceName(ua = ''): string {
+  return /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Navigateur';
 }
 
 /** True only for a direct request from this machine (not one relayed by tailscale serve or another proxy). */
@@ -145,11 +150,47 @@ export function createApp(d: Deps) {
   });
 
   // --- Pairing token on every API route ---
+  // Pairing a screen from afar: the iPhone home-screen app has its own storage, so the QR code (which pairs Safari)
+  // cannot reach it. The screen asks; the user approves on the computer running Calme; the screen picks up the token
+  // once. Requests live 5 minutes, at most 3 wait at a time, and their 128-bit id is the screen's only handle.
+  type PairRequest = { id: string; name: string; at: number; status: 'pending' | 'approved' | 'denied' };
+  const pairRequests = new Map<string, PairRequest>();
+  const PAIR_TTL = 5 * 60_000;
+  const livePairs = () => {
+    for (const [id, r] of pairRequests) if (Date.now() - r.at > PAIR_TTL) pairRequests.delete(id);
+    return [...pairRequests.values()];
+  };
+  app.post('/pair/request', (c) => {
+    if (livePairs().filter((r) => r.status === 'pending').length >= 3) return c.json({ error: 'Too many requests' }, 429);
+    const r: PairRequest = { id: randomBytes(16).toString('hex'), name: deviceName(c.req.header('user-agent')), at: Date.now(), status: 'pending' };
+    pairRequests.set(r.id, r);
+    return c.json({ id: r.id });
+  });
+  app.get('/pair/request/:id', (c) => {
+    livePairs();
+    const r = pairRequests.get(c.req.param('id'));
+    if (!r) return c.json({ status: 'expired' });
+    if (r.status === 'pending') return c.json({ status: 'pending' });
+    pairRequests.delete(r.id);
+    return c.json(r.status === 'approved' ? { status: 'approved', token: d.cfg.pairingToken } : { status: 'denied' });
+  });
+
   app.use('/api/*', async (c, next) => {
     const h = c.req.header('authorization') ?? '';
     const token = h.startsWith('Bearer ') ? h.slice(7) : '';
     if (!token || !sameSecret(token, d.cfg.pairingToken)) return c.json({ error: 'Jeton d’appairage invalide' }, 401);
     await next();
+  });
+
+  app.get('/api/pair/requests', (c) => c.json(livePairs().filter((r) => r.status === 'pending').map(({ id, name, at }) => ({ id, name, at }))));
+  app.post('/api/pair/requests/:id', async (c) => {
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    const { approve } = await c.req.json<{ approve?: unknown }>();
+    livePairs();
+    const r = pairRequests.get(c.req.param('id'));
+    if (!r || r.status !== 'pending') return c.json({ error: 'Request expired' }, 404);
+    r.status = approve === true ? 'approved' : 'denied';
+    return c.json({ ok: true });
   });
 
   app.get('/api/state', (c) => {
@@ -260,6 +301,11 @@ export function createApp(d: Deps) {
 
   app.post('/api/mail/:id/trash', async (c) => {
     await trash(gmail(), store, c.req.param('id'));
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/mail/:id/untrash', async (c) => {
+    await untrash(gmail(), store, c.req.param('id'));
     return c.json({ ok: true });
   });
 
@@ -546,8 +592,7 @@ export function createApp(d: Deps) {
   app.post('/api/push/subscribe', async (c) => {
     const sub = await c.req.json<PushSub>();
     if (!sub?.endpoint?.startsWith('https://') || !sub.keys?.p256dh || !sub.keys?.auth) return c.json({ error: 'Abonnement invalide' }, 400);
-    const ua = c.req.header('user-agent') ?? '';
-    const name = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'Navigateur';
+    const name = deviceName(c.req.header('user-agent'));
     store.addPushSub({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, name, addedAt: Date.now() });
     return c.json({ ok: true });
   });

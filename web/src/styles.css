@@ -183,6 +183,8 @@ button { cursor: pointer; }
 .compare-btn[aria-pressed='true'] { background: var(--prim-bg); color: var(--prim-fg); border-color: transparent; }
 .reader h2 { margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: clamp(30px, 3vw, 42px); line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; overflow-wrap: anywhere; }
 .reader .back { display: none; }
+.reader-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.reader-top .actions { position: relative; margin-left: auto; flex: none; flex-wrap: nowrap; }
 .claude-box { display: grid; gap: 12px; padding: 20px 22px; border-radius: 18px; background: var(--surf2); }
 .claude-box ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .claude-box li { display: grid; grid-template-columns: 28px minmax(0, 1fr); font-size: 15px; line-height: 1.5; }
@@ -481,3 +483,80 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .setup-foot { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 
 .device { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surf2); font-size: 14px; }
+
+/* Version line (sidebar) and floating "write" button (phone). */
+.version { padding: 8px 10px 0; font-size: 11px; color: var(--muted); }
+.fab { display: none; }
+
+/* Phone pass: content first, one row of controls, the mail full width, writing one tap away. */
+@media (max-width: 720px) {
+  .main { padding-bottom: calc(env(safe-area-inset-bottom) + 170px); }
+  .wide-only { display: none; }
+  .fab {
+    display: inline-flex; align-items: center; gap: 8px; position: fixed; right: 16px; z-index: 21;
+    bottom: calc(env(safe-area-inset-bottom) + 88px); min-height: 52px; padding: 0 20px 0 18px;
+    border: 0; border-radius: 999px; background: var(--prim-bg); color: var(--prim-fg); font-size: 15px; font-weight: 600;
+    box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.7);
+  }
+  .split.reading ~ .fab, .main:has(.split.reading) ~ .fab { display: none; }
+
+  .topbar { gap: 8px; }
+  .topbar .eyebrow { flex: 1 1 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+  .topbar .btn { padding: 0 14px; font-size: 13px; }
+  .triage-bar .field { flex: 1 1 0; min-width: 0; }
+
+  .headline { font-size: 34px; line-height: 1.02; max-width: none; }
+  .segs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; gap: 6px; }
+  .segs::-webkit-scrollbar { display: none; }
+  .seg { flex: 0 0 auto !important; min-height: 0; flex-direction: row; align-items: baseline; gap: 8px; padding: 10px 16px; border-radius: 999px; }
+  .seg .n { font-size: 22px; }
+  .seg .l { font-size: 13px; }
+  .row { padding: 14px 12px; border-radius: 14px; }
+  .row .subj { font-size: 20px; }
+
+  .reader { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; gap: 20px; }
+  .reader h2 { font-size: 32px; }
+  .reader-top {
+    position: sticky; top: 0; z-index: 5; margin: 0 -16px; gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px 10px; background: var(--bg); border-bottom: 1px solid var(--line);
+  }
+  .reader-top .back { padding: 0 12px 0 8px; min-height: 40px; }
+  .reader-top .btn-icon { width: 40px; min-height: 40px; }
+  .reader-top .eyebrow { flex: 1; }
+}
+
+/* Toast with an action (Undo). */
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast-act { border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; padding: 4px 2px; }
+
+/* Selection: picked rows, check circles, the selection bar. */
+.row.picked { background: var(--sel-bg); border-color: var(--sel-border); }
+.pick { grid-row: span 3; width: 18px; height: 18px; margin-top: 2px; border-radius: 999px; border: 1.5px solid var(--muted); display: grid; place-items: center; color: var(--prim-fg); }
+.row.picked .pick { background: var(--prim-bg); border-color: var(--prim-bg); }
+.row:has(.pick) { grid-template-columns: 18px minmax(0, 1fr) auto; }
+.selbar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 8px; border-radius: 16px; background: var(--surf); border: 1px solid var(--sel-border); box-shadow: var(--shadow); font-size: 14px; font-weight: 600; }
+.selbar .grow { flex: 1; }
+.selbar .btn { min-height: 40px; }
+
+/* Swipe a mail right to trash it (touch). Vertical drags stay the page's scroll. */
+.swipe { position: relative; border-radius: 16px; overflow: hidden; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding-left: 22px; background: var(--danger); color: #0d0e11; font-size: 14px; font-weight: 600; }
+.swipe-fg { position: relative; }
+.swipe-fg.moving { background: var(--bg); border-radius: 16px; }
+@media (max-width: 720px) {
+  .reading-pane { touch-action: pan-y; }
+  .selbar { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(env(safe-area-inset-bottom) + 84px); z-index: 22; }
+  .main:has(.selbar) ~ .fab { display: none; }
+}
+
+/* Pairing: ask for access, wait for the computer; banner on the computer. */
+.pair-box { width: min(440px, 100%); display: flex; flex-direction: column; gap: 18px; }
+.pair-wait { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--surf2); font-size: 14px; }
+.pair-wait .dot { animation: pulse 1.2s ease-in-out infinite; }
+.pair-wait span:nth-child(2) { flex: 1; }
+.pair-token { display: flex; flex-direction: column; gap: 12px; }
+.linkish { align-self: flex-start; border: 0; background: none; padding: 4px 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.pair-req { position: fixed; z-index: 60; top: calc(env(safe-area-inset-top) + 16px); left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 16px 18px; border-radius: 18px; background: var(--surf); border: 1px solid var(--sel-border); box-shadow: var(--shadow); }
+.pair-req strong { flex: 1 1 100%; font-size: 15px; }
+.pair-req p { flex: 1 1 100%; margin: 0; font-size: 13px; color: var(--muted); }
+@keyframes pulse { 50% { opacity: 0.3; } }

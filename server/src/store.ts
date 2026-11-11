@@ -38,6 +38,11 @@ export function openStore(path: string) {
       return (db.prepare('SELECT data FROM messages').all() as { data: string }[]).map((r) => JSON.parse(r.data));
     },
 
+    /** True when Calme has ever stored this mail (in the inbox or not). */
+    known(id: string): boolean {
+      return db.prepare('SELECT 1 FROM messages WHERE id = ?').get(id) !== undefined;
+    },
+
     knownIds(): Set<string> {
       const rows = db.prepare('SELECT id FROM messages').all() as { id: string }[];
       return new Set(rows.map((r) => r.id));

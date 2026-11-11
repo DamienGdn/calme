@@ -8,7 +8,10 @@ import IphoneCard from '../components/IphoneCard.vue';
 import NotificationsCard from '../components/NotificationsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
-import { notify, notifyError, refresh } from '../store.ts';
+import { notify, notifyError, refresh, setThemePref, store, type ThemePref } from '../store.ts';
+
+const version = __APP_VERSION__;
+const THEMES: ThemePref[] = ['system', 'light', 'dark'];
 
 interface Settings {
   autoUnsubscribe: boolean;
@@ -155,7 +158,19 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           </dd>
         </dl>
         <a class="btn" href="/auth/google" target="_blank" rel="opener" style="align-self: flex-start">{{ t('admin.reconnect') }}</a>
-        <label style="display: flex; flex-direction: column; gap: 6px; margin-top: auto">
+      </section>
+
+      <section class="card" aria-labelledby="a-app">
+        <h2 id="a-app">{{ t('admin.app') }}</h2>
+        <span class="status ok"><span class="dot" aria-hidden="true" /> Calme <span class="mono">{{ version }}</span></span>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span id="a-theme" class="eyebrow">{{ t('admin.theme') }}</span>
+          <div class="tones" role="radiogroup" aria-labelledby="a-theme" style="align-self: flex-start; max-width: 100%">
+            <button v-for="th in THEMES" :key="th" type="button" role="radio" :aria-checked="store.themePref === th" @click="setThemePref(th)">{{ t(`admin.themes.${th}`) }}</button>
+          </div>
+          <span class="muted" style="font-size: 12px">{{ t('admin.themeNote') }}</span>
+        </div>
+        <label style="display: flex; flex-direction: column; gap: 6px">
           <span class="eyebrow">{{ t('admin.language') }}</span>
           <select class="select" :value="locale" @change="changeLang(($event.target as HTMLSelectElement).value as Lang)">
             <option value="fr">Français</option>
@@ -163,6 +178,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           </select>
           <span class="muted" style="font-size: 12px">{{ t('admin.languageNote') }}</span>
         </label>
+        <a class="muted" href="https://github.com/DamienGdn/calme/releases" target="_blank" rel="noopener noreferrer" style="margin-top: auto; font-size: 12px">{{ t('admin.releases') }}</a>
       </section>
 
       <section class="card" aria-labelledby="a-sync">

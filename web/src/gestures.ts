@@ -1,0 +1,21 @@
+/** Touch gesture rules (pure, so they are testable): swipe a mail to trash it, swipe an open mail to go back. */
+
+const LOCK_PX = 10;
+
+/** Decides once, after a real move, whether a drag is ours (horizontal) or the page's scroll (vertical). */
+export function axis(dx: number, dy: number): 'x' | 'y' | null {
+  if (Math.abs(dx) < LOCK_PX && Math.abs(dy) < LOCK_PX) return null;
+  return Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+}
+
+const flick = (dx: number, ms: number, min: number) => dx > min && dx / Math.max(ms, 1) > 0.5;
+
+/** A mail dragged to the right past a third of its width, or flicked right, goes to the trash. */
+export function swipeTrashes(dx: number, width: number, ms: number): boolean {
+  return dx > 0 && (dx > width / 3 || flick(dx, ms, 60));
+}
+
+/** An open mail swiped to the right goes back to the list. */
+export function swipeBack(dx: number, width: number, ms: number): boolean {
+  return dx > 0 && (dx > Math.min(120, width * 0.3) || flick(dx, ms, 50));
+}

@@ -25,6 +25,13 @@ export async function trash(g: GmailPort, s: Store, id: string) {
   s.removeFromInbox([id]);
 }
 
+/** Undo of trash: Gmail restores the mail's labels, and Calme shows it in the inbox again. */
+export async function untrash(g: GmailPort, s: Store, id: string) {
+  if (!s.known(id)) throw new NotFound(`Mail ${id} introuvable`);
+  await g.untrash(id);
+  s.restoreToInbox([id]);
+}
+
 export async function label(g: GmailPort, s: Store, id: string, labelId: string) {
   need(s, id);
   await g.modify(id, [labelId], ['INBOX']);

@@ -16,7 +16,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <script>
-      try { var t = localStorage.getItem('calme.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+      // Theme before first paint: the saved choice, else follow the device.
+      var t = null;
+      try { t = localStorage.getItem('calme.theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+      if (t === 'light') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#EAE9E4');
       // Mac desktop window without a title bar: leave room for the traffic lights (see styles.css).
       if (window.calmeDesktop && window.calmeDesktop.platform === 'darwin') document.documentElement.dataset.desktop = 'mac';
     </script>

@@ -206,14 +206,14 @@ const TEXT = {
     toAnswer: (n) => `${n} à répondre`, none: 'Rien à répondre', many: (n) => `${n} nouveaux mails`,
     open: 'Ouvrir Calme', compose: 'Nouveau message', sync: 'Relever maintenant', notifications: 'Notifications',
     notifyAll: 'Chaque nouveau mail', notifyReply: 'Seulement « À répondre »', notifyOff: 'Désactivées',
-    login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calme',
+    pairAsk: (n) => `${n} demande l’accès à Calme`, pairBody: 'Ouvre Calme pour autoriser ou refuser.', login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calme',
   },
   en: {
     cat: { reply: 'To answer', read: 'To read', news: 'Newsletter', trash: 'To delete' },
     toAnswer: (n) => `${n} to answer`, none: 'Nothing to answer', many: (n) => `${n} new mails`,
     open: 'Open Calme', compose: 'New message', sync: 'Fetch mail now', notifications: 'Notifications',
     notifyAll: 'Every new mail', notifyReply: 'Only “To answer”', notifyOff: 'Off',
-    login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calme',
+    pairAsk: (n) => `${n} is asking for access to Calme`, pairBody: 'Open Calme to allow or refuse.', login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calme',
   },
 };
 const tx = () => TEXT[lang] ?? TEXT.en;
@@ -246,6 +246,24 @@ async function poll() {
     if (isLocal()) void ensureServer();
   }
   refreshTray();
+}
+
+/** A screen (e.g. the iPhone home-screen app) asks for access: tell the user, who approves in the window. */
+let pairSeen = new Set();
+async function pollPairs() {
+  if (!isLocal() || !Notification.isSupported()) return;
+  try {
+    const pending = (await apiFetch('/api/pair/requests')) || [];
+    for (const r of pending) {
+      if (pairSeen.has(r.id)) continue;
+      const n = new Notification({ title: tx().pairAsk(r.name), body: tx().pairBody, silent: false });
+      n.on('click', () => show());
+      n.show();
+    }
+    pairSeen = new Set(pending.map((r) => r.id));
+  } catch {
+    /* server restarting */
+  }
 }
 
 function refreshTray() {
@@ -325,6 +343,7 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     void poll();
     setInterval(poll, POLL_MS);
+    setInterval(pollPairs, 3000);
     app.on('activate', () => show());
   });
   app.on('before-quit', () => {

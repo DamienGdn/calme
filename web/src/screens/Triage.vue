@@ -3,10 +3,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CAT_CLASS, CAT_COLOR, post, when, type Category, type MailItem } from '../api.ts';
 import Icon from '../components/Icon.vue';
+import SwipeRow from '../components/SwipeRow.vue';
 import TabBar from '../components/TabBar.vue';
+import { axis, swipeBack } from '../gestures.ts';
 import { dateLocale } from '../i18n.ts';
 import { enablePush, isSubscribed, pushSupported } from '../push.ts';
-import { goTo, notify, notifyError, openEditor, refresh, store, toggleTheme } from '../store.ts';
+import { goTo, notify, notifyError, refresh, store } from '../store.ts';
 import { closeTab, cycleTab, openTab, pruneTabs, toggleCompare } from '../tabLogic.ts';
 import { tabs, updateTabs, useMedia } from '../tabs.ts';
 import Reader from './Reader.vue';
@@ -62,51 +64,119 @@ const meta = computed(() => {
   });
 });
 
-/** Plain click replaces the open mail; ⌘/Ctrl-click, middle click or long press keeps it in a new tab. */
+const phone = useMedia('(max-width: 720px)');
+
+/**
+ * Opening a mail on the phone adds a history step, so the system back gesture (and the swipe below) returns to the
+ * list instead of leaving Calme.
+ */
+function openReading() {
+  if (phone.value && !reading.value) history.pushState({ calmeReading: true }, '');
+  reading.value = true;
+}
+function closeReading() {
+  if (history.state?.calmeReading) history.back();
+  else reading.value = false;
+}
+const onPop = () => (reading.value = Boolean(history.state?.calmeReading));
+
+/** Plain click replaces the open mail; ⌘/Ctrl-click or middle click keeps it in a new tab. */
 function select(m: MailItem, background = false) {
   if (background) {
     const shown = current.value;
     updateTabs((st) => openTab(st.active || !shown ? st : openTab(st, shown.id), m.id, true));
-    if (!wide.value) notify(t('tabs.added'));
     return;
   }
   updateTabs((st) => openTab(st, m.id));
-  reading.value = true;
-  if (window.matchMedia('(max-width: 720px)').matches) window.scrollTo({ top: 0 });
+  openReading();
+  if (phone.value) window.scrollTo({ top: 0 });
 }
+
+// Selection: long press (phone) or ⇧-click starts it; while selecting, a tap toggles a mail.
+const selected = ref(new Set<string>());
+const selecting = computed(() => selected.value.size > 0);
+function toggleSelected(id: string) {
+  const next = new Set(selected.value);
+  if (!next.delete(id)) next.add(id);
+  selected.value = next;
+}
+const clearSelection = () => (selected.value = new Set());
+const selectAll = () => (selected.value = new Set(list.value.map((m) => m.id)));
+watch(emails, (all) => {
+  const ids = new Set(all.map((m) => m.id));
+  if ([...selected.value].some((id) => !ids.has(id))) selected.value = new Set([...selected.value].filter((id) => ids.has(id)));
+});
+
 function onRowClick(e: MouseEvent, m: MailItem) {
-  if (pressFired) {
-    pressFired = false;
-    return;
+  if (selecting.value || e.shiftKey) toggleSelected(m.id);
+  else select(m, e.metaKey || e.ctrlKey);
+}
+
+/** Undo for trash: Gmail untrashes, the mails come back to the inbox. */
+const undoTrash = (ids: string[]) => ({
+  label: t('common.undo'),
+  run: async () => {
+    try {
+      for (const id of ids) await post(`/api/mail/${encodeURIComponent(id)}/untrash`);
+      notify(t('triage.restored', ids.length));
+      await refresh();
+    } catch (e) {
+      notifyError(e);
+    }
+  },
+});
+
+async function trashSelection() {
+  const ids = [...selected.value];
+  if (!ids.length || busy.value) return;
+  busy.value = true;
+  try {
+    await post('/api/cleanup', { trashIds: ids });
+    clearSelection();
+    notify(t('triage.trashedMany', ids.length), false, undoTrash(ids));
+    await refresh();
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    busy.value = false;
   }
-  select(m, e.metaKey || e.ctrlKey);
 }
-let pressTimer = 0;
-let pressFired = false;
-function pressStart(e: PointerEvent, m: MailItem) {
-  if (e.pointerType !== 'touch') return;
-  pressFired = false;
-  pressTimer = window.setTimeout(() => {
-    pressFired = true;
-    navigator.vibrate?.(10);
-    select(m, true);
-  }, 500);
+
+// Swipe right on the open mail (phone) goes back to the list.
+const backDx = ref(0);
+let backStart: { x: number; y: number; t: number } | null = null;
+let backLock: 'x' | 'y' | null = null;
+function backDown(e: PointerEvent) {
+  if (e.pointerType !== 'touch' || !phone.value || !reading.value) return;
+  backStart = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+  backLock = null;
 }
-const pressEnd = () => window.clearTimeout(pressTimer);
+function backMove(e: PointerEvent) {
+  if (!backStart) return;
+  backLock ??= axis(e.clientX - backStart.x, e.clientY - backStart.y);
+  if (backLock === 'x') backDx.value = Math.max(0, e.clientX - backStart.x);
+  else if (backLock === 'y') backStart = null;
+}
+function backUp(e: PointerEvent) {
+  const go = backStart && backLock === 'x' && swipeBack(e.clientX - backStart.x, window.innerWidth, e.timeStamp - backStart.t);
+  backStart = null;
+  backDx.value = 0;
+  if (go) closeReading();
+}
 
 async function act(mail: MailItem | null, path: string, done: string, body?: unknown) {
   if (!mail) return;
   busy.value = true;
   try {
     await post(`/api/mail/${encodeURIComponent(mail.id)}/${path}`, body);
-    notify(done);
+    notify(done, false, path === 'trash' ? undoTrash([mail.id]) : undefined);
     if (tabs.value.ids.length > 1 && tabs.value.ids.includes(mail.id)) {
       updateTabs((st) => closeTab(st, mail.id));
     } else {
       const idx = list.value.findIndex((m) => m.id === mail.id);
       const next = list.value[idx + 1] ?? list.value[idx - 1];
       updateTabs((st) => (next ? openTab(st, next.id) : closeTab(st, mail.id)));
-      if (!next) reading.value = false;
+      if (!next && reading.value) closeReading();
     }
     await refresh();
   } catch (e) {
@@ -118,7 +188,8 @@ async function act(mail: MailItem | null, path: string, done: string, body?: unk
 const trash = (m: MailItem | null) => m && act(m, 'trash', t('triage.trashed', { subject: m.subject || t('common.noSubject') }));
 
 // Keyboard, ignored in fields and on other controls:
-// Return = trash the open mail (Gmail trash, recoverable 30 days) · ← → switch tab · X close tab · C compare.
+// Return = trash the open mail, or the selection (Gmail trash, recoverable 30 days, with Undo) · Escape = end the
+// selection · ← → switch tab · X close tab · C compare.
 function onKey(e: KeyboardEvent) {
   if (e.repeat || e.isComposing) return;
   const target = e.target as HTMLElement | null;
@@ -129,9 +200,15 @@ function onKey(e: KeyboardEvent) {
     return;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'Escape' && selecting.value) {
+    clearSelection();
+    return;
+  }
   if (e.key === 'Enter' && !e.shiftKey && onPage) {
     e.preventDefault();
-    if (!busy.value) void trash(current.value);
+    if (busy.value) return;
+    if (selecting.value) void trashSelection();
+    else void trash(current.value);
     return;
   }
   if (!onPage && !target?.closest('.tab-main')) return;
@@ -149,11 +226,12 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(() => {
   window.addEventListener('keydown', onKey);
+  window.addEventListener('popstate', onPop);
   if (canPush) void isSubscribed().then((v) => (pushOn.value = v));
 });
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey);
-  pressEnd();
+  window.removeEventListener('popstate', onPop);
 });
 
 async function sync() {
@@ -181,20 +259,16 @@ function askCalme() {
 
 <template>
   <div :class="['overview', { 'hide-mobile': reading }]">
-    <header class="topbar">
+    <header class="topbar triage-bar">
       <span class="eyebrow">{{ meta }}</span>
-      <label class="field" style="flex: 0 1 340px">
+      <label class="field">
         <span class="muted" style="display: flex"><Icon name="search" :size="16" /></span>
         <span class="sr">{{ t('triage.searchLabel') }}</span>
         <input v-model="query" type="search" :placeholder="t('triage.filterPlaceholder')" @keydown.enter="askCalme" />
       </label>
-      <button v-if="!pushOn && canPush" type="button" class="btn" @click="turnOnPush"><Icon name="bell" :size="16" /> {{ t('triage.enablePush') }}</button>
-      <a href="#/ecrire" class="btn btn-icon mobile-only" :aria-label="t('nav.newMessage')" @click="openEditor({})"><Icon name="pen" :size="18" /></a>
-      <button type="button" class="btn btn-icon mobile-only" :aria-label="store.theme === 'dark' ? t('common.toLight') : t('common.toDark')" @click="toggleTheme">
-        <Icon :name="store.theme === 'dark' ? 'sun' : 'moon'" :size="18" />
-      </button>
-      <button type="button" class="btn btn-prim" :disabled="store.state?.running" @click="sync">
-        <Icon name="refresh" :size="16" /> {{ store.state?.running ? t('common.syncing') : t('common.sync') }}
+      <button v-if="!pushOn && canPush" type="button" class="btn" :aria-label="t('triage.enablePush')" @click="turnOnPush"><Icon name="bell" :size="16" /> <span class="wide-only">{{ t('triage.enablePush') }}</span></button>
+      <button type="button" class="btn btn-prim" :disabled="store.state?.running" :aria-label="t('common.sync')" @click="sync">
+        <Icon name="refresh" :size="16" /> <span class="wide-only">{{ store.state?.running ? t('common.syncing') : t('common.sync') }}</span>
       </button>
     </header>
 
@@ -244,32 +318,43 @@ function askCalme() {
 
   <div :class="['split', { reading, comparing }]">
     <section class="list" :aria-label="t('triage.mails')">
-      <button
-        v-for="(m, i) in list"
-        :key="m.id"
-        type="button"
-        :class="['row rise', { open: tabs.ids.includes(m.id) }]"
-        :style="{ animationDelay: `${Math.min(i, 10) * 50}ms` }"
-        :aria-current="current?.id === m.id"
-        :title="t('tabs.rowHint')"
-        @click="onRowClick($event, m)"
-        @auxclick="$event.button === 1 && select(m, true)"
-        @pointerdown="pressStart($event, m)"
-        @pointerup="pressEnd"
-        @pointercancel="pressEnd"
-        @pointerleave="pressEnd"
-        @contextmenu="pressFired && $event.preventDefault()"
-      >
-        <span class="mark" :style="{ background: m.analysis ? CAT_COLOR[m.analysis.category] : 'var(--line)' }" aria-hidden="true" />
-        <span class="from">{{ m.fromName }}</span>
-        <span class="time">{{ when(m.date) }}</span>
-        <span class="subj">{{ m.subject || t('common.noSubject') }}</span>
-        <span class="one">{{ m.analysis?.summary[0] ?? (m.analysis ? m.snippet : t('triage.notRead')) }}</span>
-      </button>
+      <div v-if="selecting" class="selbar" role="toolbar" :aria-label="t('triage.selection')">
+        <button type="button" class="btn btn-icon" :aria-label="t('triage.clearSelection')" @click="clearSelection">×</button>
+        <span class="grow">{{ t('triage.selected', selected.size) }}</span>
+        <button type="button" class="btn" @click="selectAll">{{ t('triage.selectAll') }}</button>
+        <button type="button" class="btn btn-danger" :disabled="busy" @click="trashSelection"><Icon name="trash" :size="16" /> {{ t('triage.trashShort') }}</button>
+      </div>
+      <SwipeRow v-for="(m, i) in list" :key="m.id" :label="t('triage.trashShort')" @trash="trash(m)" @hold="toggleSelected(m.id)">
+        <button
+          type="button"
+          :class="['row rise', { open: tabs.ids.includes(m.id), picked: selected.has(m.id) }]"
+          :style="{ animationDelay: `${Math.min(i, 10) * 50}ms` }"
+          :aria-current="!selecting && current?.id === m.id"
+          :aria-pressed="selecting ? selected.has(m.id) : undefined"
+          :title="t('tabs.rowHint')"
+          @click="onRowClick($event, m)"
+          @auxclick="$event.button === 1 && select(m, true)"
+        >
+          <span v-if="selecting" class="pick" aria-hidden="true"><Icon v-if="selected.has(m.id)" name="check" :size="12" /></span>
+          <span v-else class="mark" :style="{ background: m.analysis ? CAT_COLOR[m.analysis.category] : 'var(--line)' }" aria-hidden="true" />
+          <span class="from">{{ m.fromName }}</span>
+          <span class="time">{{ when(m.date) }}</span>
+          <span class="subj">{{ m.subject || t('common.noSubject') }}</span>
+          <span class="one">{{ m.analysis?.summary[0] ?? (m.analysis ? m.snippet : t('triage.notRead')) }}</span>
+        </button>
+      </SwipeRow>
       <p v-if="!list.length" class="empty">{{ store.state ? t('common.nothingHere') : t('common.loading') }}</p>
     </section>
 
-    <div v-if="current" :class="['reading-pane', { 'has-tabs': showTabs }]">
+    <div
+      v-if="current"
+      :class="['reading-pane', { 'has-tabs': showTabs }]"
+      :style="backDx ? { transform: `translateX(${backDx}px)`, opacity: String(1 - backDx / 700) } : undefined"
+      @pointerdown="backDown"
+      @pointermove="backMove"
+      @pointerup="backUp"
+      @pointercancel="backDx = 0"
+    >
       <TabBar
         v-if="showTabs"
         :items="tabItems"
@@ -285,7 +370,7 @@ function askCalme() {
           :key="current.id"
           :mail="current"
           :busy="busy"
-          @back="reading = false"
+          @back="closeReading"
           @archive="act(current, 'archive', t('triage.archived'))"
           @trash="trash(current)"
           @label="(id, name) => act(current, 'label', t('triage.filed', { name }), { labelId: id })"
@@ -295,7 +380,7 @@ function askCalme() {
           :key="`cmp-${second.id}`"
           :mail="second"
           :busy="busy"
-          @back="reading = false"
+          @back="closeReading"
           @archive="act(second, 'archive', t('triage.archived'))"
           @trash="trash(second)"
           @label="(id, name) => act(second, 'label', t('triage.filed', { name }), { labelId: id })"

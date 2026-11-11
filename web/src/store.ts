@@ -5,8 +5,11 @@ import { api, getToken, setToken, Unauthorized, type AppState } from './api.ts';
 export const store = reactive({
   paired: Boolean(getToken()),
   state: null as AppState | null,
-  toast: null as { text: string; err?: boolean } | null,
+  toast: null as { text: string; err?: boolean; action?: ToastAction } | null,
+  /** Theme actually shown. */
   theme: document.documentElement.dataset.theme || 'dark',
+  /** Per-device choice: follow the device (iPhone, Mac…) or a fixed theme. */
+  themePref: readThemePref(),
 });
 
 export interface Draft {
@@ -17,11 +20,23 @@ export interface Draft {
 }
 export const draft = ref<Draft>({});
 
+/** A button in the toast, e.g. "Undo" after a trash. */
+export interface ToastAction {
+  label: string;
+  run: () => void | Promise<void>;
+}
+
 let toastTimer = 0;
-export function notify(text: string, err = false) {
-  store.toast = { text, err };
+export function notify(text: string, err = false, action?: ToastAction) {
+  store.toast = { text, err, action };
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => (store.toast = null), 4000);
+  toastTimer = window.setTimeout(() => (store.toast = null), action ? 7000 : 4000);
+}
+
+export function runToastAction() {
+  const a = store.toast?.action;
+  store.toast = null;
+  void a?.run();
 }
 export const notifyError = (e: unknown) => notify((e as Error).message, true);
 
@@ -36,17 +51,40 @@ export async function refresh() {
   }
 }
 
-export function toggleTheme() {
-  const next = store.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = next;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', next === 'dark' ? '#0D0E11' : '#EAE9E4');
+export type ThemePref = 'system' | 'light' | 'dark';
+
+function readThemePref(): ThemePref {
   try {
-    localStorage.setItem('calme.theme', next);
+    const v = localStorage.getItem('calme.theme');
+    return v === 'light' || v === 'dark' ? v : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+function applyTheme() {
+  const theme = store.themePref === 'system' ? (darkQuery.matches ? 'dark' : 'light') : store.themePref;
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#0D0E11' : '#EAE9E4');
+  store.theme = theme;
+}
+
+export function setThemePref(pref: ThemePref) {
+  try {
+    if (pref === 'system') localStorage.removeItem('calme.theme');
+    else localStorage.setItem('calme.theme', pref);
   } catch {
     /* not persisted */
   }
-  store.theme = next;
+  store.themePref = pref;
+  applyTheme();
 }
+
+// Following the device: switch live when it changes (e.g. iPhone automatic dark mode at night).
+darkQuery.addEventListener('change', () => store.themePref === 'system' && applyTheme());
+applyTheme();
 
 export type Route = 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
 const ROUTES: Route[] = ['tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];

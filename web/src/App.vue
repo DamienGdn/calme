@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, CAT_COLOR, type Category } from './api.ts';
 import Icon, { type IconName } from './components/Icon.vue';
+import PairRequests from './components/PairRequests.vue';
 import QuotaGauge from './components/QuotaGauge.vue';
 import { setLang } from './i18n.ts';
 import { registerWorker } from './push.ts';
@@ -16,7 +17,11 @@ import Pairing from './screens/Pairing.vue';
 import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
-import { draft, parseHash, refresh, store, toggleTheme, type Route } from './store.ts';
+import { draft, openEditor, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
+
+const version = __APP_VERSION__;
+/** Access requests from other screens are approved only on the computer running Calme. */
+const onComputer = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 
 const { t, locale } = useI18n();
 const loc = ref(parseHash());
@@ -149,9 +154,7 @@ const depth = (name: string) => name.split('/').length - 1;
           <span class="grow">{{ t('nav.admin') }}</span>
           <span class="muted" style="font-size: 12px">{{ healthy ? t('nav.adminOk') : t('nav.adminCheck') }}</span>
         </a>
-        <button type="button" class="nav-item" @click="toggleTheme">
-          <Icon :name="store.theme === 'dark' ? 'sun' : 'moon'" :size="18" /> <span class="grow">{{ store.theme === 'dark' ? t('common.lightMode') : t('common.darkMode') }}</span>
-        </button>
+        <span class="version mono">Calme {{ version }}</span>
       </div>
     </aside>
 
@@ -166,10 +169,16 @@ const depth = (name: string) => name.split('/').length - 1;
       <Search v-else-if="route === 'recherche'" :initial="loc.arg" />
     </main>
 
+    <button v-if="['tri', 'dossiers', 'recherche'].includes(route)" type="button" class="fab" @click="openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>
+
     <nav class="tabbar" :aria-label="t('nav.tabs')">
       <a v-for="[r, label, icon] in tabs" :key="r" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined"><Icon :name="icon" /> {{ t(label) }}</a>
     </nav>
 
-    <div v-if="store.toast" :class="['toast', { err: store.toast.err }]" role="status">{{ store.toast.text }}</div>
+    <PairRequests v-if="onComputer" />
+    <div v-if="store.toast" :class="['toast', { err: store.toast.err }]" role="status">
+      {{ store.toast.text }}
+      <button v-if="store.toast.action" type="button" class="toast-act" @click="runToastAction">{{ store.toast.action.label }}</button>
+    </div>
   </div>
 </template>

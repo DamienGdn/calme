@@ -134,6 +134,21 @@ describe('api actions', () => {
     expect(store.getMail('a')).toBeNull();
   });
 
+  it('undoes a trash: untrashes in Gmail and brings the mail back to the inbox', async () => {
+    const { app, store, g } = setup();
+    await app.request('/api/mail/a/trash', { method: 'POST', headers: auth });
+    const res = await app.request('/api/mail/a/untrash', { method: 'POST', headers: auth });
+    expect(res.status).toBe(200);
+    expect(g.calls.find((c) => c.method === 'untrash')?.args).toEqual(['a']);
+    expect(store.getMail('a')?.id).toBe('a');
+  });
+
+  it('refuses to untrash a mail Calme never had', async () => {
+    const { app, g } = setup();
+    expect((await app.request('/api/mail/zzz/untrash', { method: 'POST', headers: auth })).status).toBe(404);
+    expect(g.calls.some((c) => c.method === 'untrash')).toBe(false);
+  });
+
   it('returns 404 for an unknown mail', async () => {
     const { app } = setup();
     expect((await app.request('/api/mail/zzz/archive', { method: 'POST', headers: auth })).status).toBe(404);
@@ -511,5 +526,53 @@ describe('web app manifest', () => {
   it('never echoes a wrong token', async () => {
     expect((await manifest('?k=nope')).body.start_url).toBe('/');
     expect((await manifest(`?k=${TOKEN}x`)).body.start_url).toBe('/');
+  });
+});
+
+describe('pairing a screen from afar (iPhone home-screen app)', () => {
+  const LOCAL = { incoming: { socket: { remoteAddress: '127.0.0.1' } } };
+  const iphone = { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X)', 'x-forwarded-for': '100.64.0.2' };
+  const ask = async (app: ReturnType<typeof setup>['app']) => (await (await app.request('/pair/request', { method: 'POST', headers: iphone })).json()) as { id: string };
+  const look = async (app: ReturnType<typeof setup>['app'], id: string) => (await app.request(`/pair/request/${id}`, { headers: iphone })).json();
+  const decide = (app: ReturnType<typeof setup>['app'], id: string, approve: boolean, env: object | undefined = LOCAL, headers: Record<string, string> = {}) =>
+    app.request(`/api/pair/requests/${id}`, { method: 'POST', headers: { ...auth, 'content-type': 'application/json', ...headers }, body: JSON.stringify({ approve }) }, env);
+
+  it('lists the waiting request, named after the device, to paired screens only', async () => {
+    const { app } = setup();
+    const { id } = await ask(app);
+    expect(id).toMatch(/^[0-9a-f]{32}$/);
+    expect((await app.request('/api/pair/requests')).status).toBe(401);
+    const list = await (await app.request('/api/pair/requests', { headers: auth })).json();
+    expect(list).toEqual([expect.objectContaining({ id, name: 'iPhone' })]);
+    expect(await look(app, id)).toEqual({ status: 'pending' });
+  });
+
+  it('hands the token once, after approval on the computer', async () => {
+    const { app } = setup();
+    const { id } = await ask(app);
+    expect((await decide(app, id, true)).status).toBe(200);
+    expect(await look(app, id)).toEqual({ status: 'approved', token: TOKEN });
+    expect(await look(app, id)).toEqual({ status: 'expired' });
+  });
+
+  it('only the computer running Calme can approve', async () => {
+    const { app } = setup();
+    const { id } = await ask(app);
+    expect((await decide(app, id, true, undefined, { 'x-forwarded-for': '100.64.0.2' })).status).toBe(403);
+    expect(await look(app, id)).toEqual({ status: 'pending' });
+  });
+
+  it('tells the screen when the request is refused, without a token', async () => {
+    const { app } = setup();
+    const { id } = await ask(app);
+    await decide(app, id, false);
+    expect(await look(app, id)).toEqual({ status: 'denied' });
+  });
+
+  it('caps the waiting requests and knows nothing of unknown ids', async () => {
+    const { app } = setup();
+    for (let i = 0; i < 3; i++) await ask(app);
+    expect((await app.request('/pair/request', { method: 'POST', headers: iphone })).status).toBe(429);
+    expect(await look(app, 'f'.repeat(32))).toEqual({ status: 'expired' });
   });
 });

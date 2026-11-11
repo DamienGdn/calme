@@ -1,7 +1,7 @@
 <script setup lang="ts">
 export type IconName =
   | 'sort' | 'pen' | 'trash' | 'folder' | 'archive' | 'refresh' | 'sun' | 'moon' | 'back' | 'arrow'
-  | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns';
+  | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns' | 'check';
 
 defineProps<{ name: IconName; size?: number }>();
 
@@ -21,6 +21,7 @@ const PATHS: Record<IconName, string[]> = {
   clip: ['M21 11l-9 9a6 6 0 0 1-8.5-8.5l9-9a4 4 0 0 1 5.7 5.7l-9 9a2 2 0 0 1-2.8-2.8l8.3-8.3'],
   calendar: ['M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'M16 3v4M8 3v4M3 10h18'],
   unsub: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 7 9 6 9-6', 'M4 20 20 4'],
+  check: ['M5 12.5l4.5 4.5L19 7.5'],
   columns: ['M5 4h5v16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z', 'M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5Z'],
   gear: [
     'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',

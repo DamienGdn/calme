@@ -17,6 +17,7 @@ const consent = ref<string | null>(null);
 const load = () => api<typeof r.value>('/api/remote').then((v) => (r.value = v)).catch(notifyError);
 onMounted(load);
 
+
 watch(r, async (v) => {
   qr.value = null;
   if (!v?.serving || !v.url) return;
@@ -71,6 +72,7 @@ async function enable() {
         </ol>
       </div>
       <span class="mono muted" style="font-size: 12px; overflow-wrap: anywhere">{{ r.url }}</span>
+      <p class="muted" style="margin: 0; font-size: 12px; line-height: 1.5">{{ t('iphone.askNote') }}</p>
     </template>
     <span :class="['status', aiOk ? 'ok' : 'ko']" style="margin-top: auto; font-size: 13px">
       <span class="dot" aria-hidden="true" /> {{ aiOk ? t('iphone.aiOk') : t('iphone.aiKo') }}
