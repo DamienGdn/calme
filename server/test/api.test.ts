@@ -487,3 +487,29 @@ describe('api cleanup', () => {
     expect(String(fetched[0].init?.body)).toBe('List-Unsubscribe=One-Click');
   });
 });
+
+describe('web app manifest', () => {
+  const manifest = async (query = '') => {
+    const { app } = setup();
+    const res = await app.request(`/manifest.webmanifest${query}`);
+    return { res, body: (await res.json()) as { start_url: string; name: string; display: string } };
+  };
+
+  it('is public and opens the inbox by default', async () => {
+    const { res, body } = await manifest();
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/manifest+json');
+    expect(body).toMatchObject({ name: 'Calme', display: 'standalone', start_url: '/' });
+  });
+
+  it('carries the pairing into the home-screen app when the paired page asks with the right token', async () => {
+    const { res, body } = await manifest(`?k=${TOKEN}`);
+    expect(body.start_url).toBe(`/#pair=${TOKEN}`);
+    expect(res.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('never echoes a wrong token', async () => {
+    expect((await manifest('?k=nope')).body.start_url).toBe('/');
+    expect((await manifest(`?k=${TOKEN}x`)).body.start_url).toBe('/');
+  });
+});

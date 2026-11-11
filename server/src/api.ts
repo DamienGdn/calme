@@ -49,6 +49,21 @@ export interface Deps {
   restart?: () => void;
 }
 
+const MANIFEST = {
+  name: 'Calme',
+  short_name: 'Calme',
+  description: 'Your Gmail, sorted by Calme.',
+  start_url: '/',
+  scope: '/',
+  display: 'standalone',
+  background_color: '#0D0E11',
+  theme_color: '#0D0E11',
+  icons: [
+    { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+    { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+  ],
+};
+
 function sameSecret(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -85,6 +100,23 @@ export function createApp(d: Deps) {
   });
 
   // --- Google OAuth (only from the PC itself) ---
+  // Web app manifest. On iPhone the home-screen app does not share Safari's storage, so a paired page asks for
+  // ?k=<token> and the home-screen app starts at /#pair=<token>, pairing itself on first launch. A wrong token
+  // is never echoed.
+  app.get('/manifest.webmanifest', (c) => {
+    const k = c.req.query('k');
+    const paired = k !== undefined && sameSecret(k, d.cfg.pairingToken);
+    c.header('Cache-Control', 'no-store');
+    return c.body(
+      JSON.stringify({
+        ...MANIFEST,
+        start_url: paired ? `/#pair=${encodeURIComponent(k)}` : '/',
+      }),
+      200,
+      { 'Content-Type': 'application/manifest+json' },
+    );
+  });
+
   app.get('/auth/google', (c) => {
     if (!isLocalRequest(c)) return c.text('Connexion Gmail possible uniquement depuis le PC qui fait tourner Calme.', 403);
     const state = randomBytes(16).toString('hex');

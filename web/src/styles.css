@@ -360,12 +360,16 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .slots { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 14px; background: var(--surf2); }
 .slot { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--accent); font-size: 13px; text-transform: capitalize; }
 
-/* Independent scroll: on desktop the list and the open mail each scroll on their own. */
+/* Independent scroll: on desktop the list and the open mail each scroll on their own and stick to the top.
+   Scrolling up past the top of either brings the page back up, so the inbox header is never out of reach.
+   --stick is where they stick: below the window buttons in the Mac app. */
 @media (min-width: 721px) {
-  .split .list { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; scrollbar-width: thin; }
-  .split .reading-pane { position: sticky; top: 16px; }
-  .split .reader { max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-  .split .reading-pane.has-tabs .reader { max-height: calc(100vh - 32px - 54px); }
+  .split { --stick: 16px; }
+  [data-desktop='mac'] .split { --stick: 44px; }
+  .split .list { position: sticky; top: var(--stick); max-height: calc(100vh - var(--stick) - 16px); overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+  .split .reading-pane { position: sticky; top: var(--stick); }
+  .split .reader { max-height: calc(100vh - var(--stick) - 16px); overflow-y: auto; scrollbar-width: thin; }
+  .split .reading-pane.has-tabs .reader { max-height: calc(100vh - var(--stick) - 16px - 54px); }
 }
 
 /* Calendar views */

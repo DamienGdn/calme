@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import App from './App.vue';
-import { setToken } from './api.ts';
+import { linkManifest, setToken } from './api.ts';
 import { i18n } from './i18n.ts';
 import './styles.css';
 
@@ -11,5 +11,5 @@ const pair = /^#pair=([0-9a-f]{16,128})$/i.exec(location.hash);
 if (pair) {
   setToken(pair[1]);
   history.replaceState(null, '', '/#/tri');
-}
+} else linkManifest();
 createApp(App).use(i18n).mount('#root');

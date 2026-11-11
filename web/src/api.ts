@@ -48,6 +48,16 @@ export function setToken(token: string | null) {
     /* storage unavailable: token lives for this page only */
   }
   if (token) window.calmeDesktop?.setToken(token);
+  linkManifest(token);
+}
+
+/**
+ * On iPhone the home-screen app does not share Safari's storage. Once this page is paired, its manifest asks the
+ * server for a start URL that carries the pairing, so the icon added from here pairs itself on first launch.
+ */
+export function linkManifest(token: string | null = getToken()) {
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  document.querySelector('link[rel="manifest"]')?.setAttribute('href', token ? `/manifest.webmanifest?k=${encodeURIComponent(token)}` : '/manifest.webmanifest');
 }
 
 export class Unauthorized extends Error {}
