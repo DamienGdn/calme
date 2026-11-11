@@ -40,7 +40,7 @@ export interface Deps {
   backup?: { dir: string; dbPath: string };
   remote?: {
     status(): Promise<{ installed: boolean; serving: boolean; url: string | null }>;
-    enable(): Promise<{ url: string | null }>;
+    enable(): Promise<{ url: string | null; consentUrl?: string | null }>;
   };
   claudeInfo?: () => Promise<{ installed: boolean; version: string | null }>;
   claudeTest?: () => Promise<{ ok: boolean; ms: number; error?: string }>;

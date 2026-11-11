@@ -355,6 +355,10 @@ const fr = {
     step3: 'Ouvre Calme depuis l’icône et active les notifications.',
     aiOk: 'IA : l’iPhone utilise Calme et Claude Code via ce Mac',
     aiKo: 'IA : Claude Code ne répond pas sur ce Mac',
+    consentTitle: 'Une autorisation Tailscale à donner',
+    consentNote: 'Tailscale demande d’activer le partage (Serve, en HTTPS) sur ton réseau privé. Ouvre la page, clique sur Activer, puis reviens ici.',
+    consentOpen: 'Autoriser dans Tailscale',
+    consentRetry: 'C’est fait, partager',
   },
   notif: {
     what: 'Notifier sur l’iPhone',
@@ -815,6 +819,10 @@ const en: Messages = {
     step3: 'Open Calme from its icon and enable notifications.',
     aiOk: 'AI: the iPhone uses Calme and Claude Code through this computer',
     aiKo: 'AI: Claude Code isn’t answering on this computer',
+    consentTitle: 'Tailscale needs your approval',
+    consentNote: 'Tailscale asks you to enable sharing (Serve, over HTTPS) on your private network. Open the page, click Enable, then come back here.',
+    consentOpen: 'Approve in Tailscale',
+    consentRetry: 'Done, share now',
   },
   notif: {
     what: 'Notify on the iPhone',

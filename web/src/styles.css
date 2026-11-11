@@ -438,7 +438,7 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
   .kv dt { font-size: 12px; }
   .kv dd { margin-bottom: 8px; }
 }
-@container (min-width: 900px) { .kv { grid-template-columns: repeat(4, max-content minmax(0, 1fr)); } }
+@container (min-width: 760px) { .kv { grid-template-columns: repeat(2, max-content minmax(0, 1fr)); column-gap: 20px; } }
 
 /* Mac desktop app (hidden title bar): space for the window buttons, and the top strip drags the window. */
 /* Opaque strip pinned at the top of the scrolling sidebar: content scrolls under it, never under the traffic lights. */

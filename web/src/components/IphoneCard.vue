@@ -11,6 +11,8 @@ const { t } = useI18n();
 const r = ref<{ installed: boolean; serving: boolean; url: string | null } | null>(null);
 const busy = ref(false);
 const qr = ref<string | null>(null);
+/** Tailscale's approval page when Serve/HTTPS is not yet enabled on the tailnet. */
+const consent = ref<string | null>(null);
 
 const load = () => api<typeof r.value>('/api/remote').then((v) => (r.value = v)).catch(notifyError);
 onMounted(load);
@@ -25,7 +27,8 @@ watch(r, async (v) => {
 async function enable() {
   busy.value = true;
   try {
-    await post('/api/remote/enable');
+    const res = await post<{ url: string | null; consentUrl?: string | null }>('/api/remote/enable');
+    consent.value = res.consentUrl ?? null;
     await load();
   } catch (e) {
     notifyError(e);
@@ -44,6 +47,12 @@ async function enable() {
       <p class="muted" style="margin: 0; font-size: 13px; line-height: 1.6">{{ t('iphone.installTailscale') }}</p>
       <a class="btn" href="https://tailscale.com/download" target="_blank" rel="noopener noreferrer" style="align-self: flex-start">tailscale.com/download</a>
       <button type="button" class="btn" style="align-self: flex-start" @click="load">{{ t('setup.recheck') }}</button>
+    </template>
+    <template v-else-if="!r.serving && consent">
+      <span class="status ko"><span class="dot" aria-hidden="true" /> {{ t('iphone.consentTitle') }}</span>
+      <p class="muted" style="margin: 0; font-size: 13px; line-height: 1.6">{{ t('iphone.consentNote') }}</p>
+      <a class="btn btn-prim" :href="consent" target="_blank" rel="noopener noreferrer" style="align-self: flex-start">{{ t('iphone.consentOpen') }}</a>
+      <button type="button" class="btn" :disabled="busy" style="align-self: flex-start" @click="enable">{{ busy ? t('common.loading') : t('iphone.consentRetry') }}</button>
     </template>
     <template v-else-if="!r.serving">
       <span class="status ko"><span class="dot" aria-hidden="true" /> {{ t('iphone.notShared') }}</span>
