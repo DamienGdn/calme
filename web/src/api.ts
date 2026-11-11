@@ -1,0 +1,111 @@
+import { ref, watch, type Ref } from 'vue';
+import type { Category, MailView } from '../../server/src/types.ts';
+import { dateLocale, i18n } from './i18n.ts';
+
+export type { Category, MailView };
+
+/** A mail as listed in /api/state: everything but the body, fetched on demand with useMailBody. */
+export type MailItem = Omit<MailView, 'text'>;
+
+export interface AppState {
+  gmail: 'connected' | 'disconnected' | 'no-credentials';
+  counts: Record<Category, number>;
+  emails: MailItem[];
+  lastSync: number | null;
+  analyzing: number;
+  running: boolean;
+  error: string | null;
+  language?: 'fr' | 'en';
+}
+
+export interface CleanupView {
+  groups: { group: string; count: number; ids: string[] }[];
+  newsletters: { fromName: string; fromEmail: string; count: number; ids: string[]; canUnsub: boolean }[];
+}
+
+declare global {
+  interface Window {
+    calmeDesktop?: { setToken(token: string): void; platform?: string };
+  }
+}
+
+const KEY = 'calme.token';
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(KEY, token);
+    else localStorage.removeItem(KEY);
+  } catch {
+    /* storage unavailable: token lives for this page only */
+  }
+  if (token) window.calmeDesktop?.setToken(token);
+}
+
+export class Unauthorized extends Error {}
+
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  const token = getToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (init.body && !(init.body instanceof FormData) && !headers.has('content-type')) headers.set('content-type', 'application/json');
+  const res = await fetch(path, { ...init, headers });
+  if (res.status === 401) throw new Unauthorized();
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
+  return body as T;
+}
+
+export const post = <T>(path: string, body?: unknown) =>
+  api<T>(path, { method: 'POST', body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body) });
+
+export const CAT_COLOR: Record<Category, string> = {
+  reply: 'var(--hot)',
+  read: 'var(--read)',
+  news: 'var(--news)',
+  trash: 'var(--trash)',
+};
+export const CAT_CLASS: Record<Category, string> = { reply: 'c-reply', read: 'c-read', news: 'c-news', trash: 'c-trash' };
+
+/** Short, human date: time today, "yesterday", weekday this week, else day + month. */
+export function when(ts: number): string {
+  const loc = dateLocale();
+  const d = new Date(ts);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return i18n.global.t('common.yesterday');
+  if (now.getTime() - ts < 6 * 86400_000) return d.toLocaleDateString(loc, { weekday: 'short' });
+  return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });
+}
+
+/** Full text of a mail, loaded when it is opened (the list only carries headers). */
+export function useMailBody(id: Ref<string | undefined>, source: Ref<'inbox' | 'archive' | 'gmail'> = ref('inbox')) {
+  const body = ref<string | null>(null);
+  watch(
+    [id, source],
+    async ([mailId, src], _old, onCleanup) => {
+      body.value = null;
+      if (!mailId) return;
+      let alive = true;
+      onCleanup(() => (alive = false));
+      const path = src === 'archive' ? '/api/archive/' : src === 'gmail' ? '/api/gmail/' : '/api/mail/';
+      try {
+        const m = await api<MailView>(path + encodeURIComponent(mailId));
+        if (alive) body.value = m.text;
+      } catch {
+        if (alive) body.value = '';
+      }
+    },
+    { immediate: true },
+  );
+  return body;
+}

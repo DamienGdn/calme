@@ -1,0 +1,21 @@
+{
+  "name": "@calme/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "icons": "node scripts/icons.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "sharp": "^0.35.5",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.6",
+    "vue-tsc": "^3.3.14"
+  },
+  "dependencies": {
+    "vue": "~3.5.45",
+    "vue-i18n": "^11.4.18"
+  }
+}

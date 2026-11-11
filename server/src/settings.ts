@@ -1,0 +1,52 @@
+import type { Store } from './store.ts';
+
+export const MODELS = ['haiku', 'sonnet', 'opus'] as const;
+export type Model = (typeof MODELS)[number];
+
+/** Depth of the local mail base, in months (0 = recent mail only). */
+export const LANGUAGES = ['fr', 'en'] as const;
+export type Language = (typeof LANGUAGES)[number];
+
+export const ARCHIVE_MONTHS = [0, 1, 3, 6, 12, 24, 36];
+
+export interface Settings {
+  autoUnsubscribe: boolean;
+  keepSenders: string[];
+  archiveMonths: number;
+  language: Language;
+  model: string;
+  intervalMin: number;
+}
+
+/** User-editable settings (admin page), stored in the database; env/config values are the defaults. */
+export function getSettings(s: Store, defaults: { model: string; intervalMin: number }): Settings {
+  const saved = JSON.parse(s.getMeta('settings') ?? '{}') as Partial<Settings>;
+  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', ...defaults, ...saved };
+}
+
+export function saveSettings(s: Store, patch: Partial<Settings>): void {
+  const next: Partial<Settings> = JSON.parse(s.getMeta('settings') ?? '{}');
+  if (patch.model !== undefined) {
+    if (!MODELS.includes(patch.model as Model)) throw new Error(`Modèle inconnu : ${patch.model}`);
+    next.model = patch.model;
+  }
+  if (patch.intervalMin !== undefined) {
+    if (!Number.isInteger(patch.intervalMin) || patch.intervalMin < 1 || patch.intervalMin > 1440)
+      throw new Error('Intervalle entre 1 et 1440 minutes');
+    next.intervalMin = patch.intervalMin;
+  }
+  if (patch.archiveMonths !== undefined) {
+    if (!ARCHIVE_MONTHS.includes(patch.archiveMonths)) throw new Error(`Profondeur possible : ${ARCHIVE_MONTHS.join(', ')} mois`);
+    next.archiveMonths = patch.archiveMonths;
+  }
+  if (patch.language !== undefined) {
+    if (!LANGUAGES.includes(patch.language)) throw new Error(`Unknown language: ${patch.language}`);
+    next.language = patch.language;
+  }
+  if (patch.autoUnsubscribe !== undefined) next.autoUnsubscribe = Boolean(patch.autoUnsubscribe);
+  if (patch.keepSenders !== undefined) {
+    if (!Array.isArray(patch.keepSenders)) throw new Error('keepSenders doit être une liste');
+    next.keepSenders = [...new Set(patch.keepSenders.map((e) => String(e).trim().toLowerCase()).filter(Boolean))];
+  }
+  s.setMeta('settings', JSON.stringify(next));
+}

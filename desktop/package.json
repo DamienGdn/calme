@@ -1,0 +1,100 @@
+{
+  "name": "calme-desktop",
+  "productName": "Calme",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Calme — your mail, without the noise.",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "node scripts/bundle-server.mjs && electron .",
+    "bundle": "node scripts/bundle-server.mjs",
+    "dist": "pnpm -C ../web build && node scripts/bundle-server.mjs && electron-builder"
+  },
+  "build": {
+    "appId": "app.calme.desktop",
+    "productName": "Calme",
+    "directories": {
+      "output": "out",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "build/icon.png",
+      "build/tray*.png",
+      "build/trayTemplate*.png"
+    ],
+    "extraResources": [
+      {
+        "from": "app",
+        "to": "app"
+      }
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSUserNotificationAlertStyle": "alert"
+      }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "dmg": {
+      "background": "build/background.png",
+      "iconSize": 96,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 222,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 222,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^38.8.6",
+    "electron-builder": "^26.18.0",
+    "esbuild": "0.25.12"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "calme",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "pnpm -C server start",
+    "calme": "pnpm -s -C server cli",
+    "test": "pnpm -C server test",
+    "build": "pnpm -C web build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  }
+}
