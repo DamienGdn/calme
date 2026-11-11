@@ -1,7 +1,7 @@
 {
   "name": "calme-desktop",
   "productName": "Calme",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Calme — your mail, without the noise.",
   "main": "main.cjs",
