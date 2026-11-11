@@ -539,7 +539,7 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 .selbar .btn { min-height: 40px; }
 
 /* Swipe a mail right to trash it (touch). Vertical drags stay the page's scroll. */
-.swipe { position: relative; border-radius: 16px; overflow: hidden; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.swipe { flex: none; position: relative; border-radius: 16px; overflow: hidden; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .swipe-bg { position: absolute; inset: 0; display: flex; align-items: center; gap: 8px; padding-left: 22px; background: var(--danger); color: #0d0e11; font-size: 14px; font-weight: 600; }
 .swipe-fg { position: relative; }
 .swipe-fg.moving { background: var(--bg); border-radius: 16px; }
