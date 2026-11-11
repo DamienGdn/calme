@@ -3,7 +3,7 @@ import type { ClaudeRunner } from '../src/claude.ts';
 import { withLanguage } from '../src/language.ts';
 
 describe('withLanguage', () => {
-  it('asks Calme to answer in English when the app is in English', async () => {
+  it('asks Calm to answer in English when the app is in English', async () => {
     const seen: string[] = [];
     const inner: ClaudeRunner = async (i) => {
       seen.push(i.system);

@@ -21,7 +21,7 @@ import { mapUrl } from './glass.ts';
 import { draft, openEditor, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
 
 const version = __APP_VERSION__;
-/** Access requests from other screens are approved only on the computer running Calme. */
+/** Access requests from other screens are approved only on the computer running Calm. */
 const onComputer = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 
 // Liquid glass refraction: a displacement map the size of the menu bar, rebuilt when the bar changes size.
@@ -73,7 +73,7 @@ watch(
   { immediate: true },
 );
 
-// Follow the language chosen on the server (shared by every screen, the desktop app and Calme's own texts).
+// Follow the language chosen on the server (shared by every screen, the desktop app and Calm's own texts).
 watch(
   () => store.state?.language,
   (lang) => {
@@ -124,7 +124,7 @@ const depth = (name: string) => name.split('/').length - 1;
     <aside class="sidebar" :aria-label="t('nav.main')">
       <div class="brand">
         <span class="logo" aria-hidden="true">c.</span>
-        <span class="serif" style="font-size: 26px; font-style: italic">Calme</span>
+        <span class="wordmark">Calm<span class="wordmark-dot">.</span></span>
       </div>
 
       <a href="#/ecrire" class="btn btn-prim" style="min-height: 44px" @click="draft = {}"><Icon name="pen" :size="16" /> {{ t('nav.newMessage') }}</a>
@@ -172,7 +172,7 @@ const depth = (name: string) => name.split('/').length - 1;
           <span class="grow">{{ t('nav.admin') }}</span>
           <span class="muted" style="font-size: 12px">{{ healthy ? t('nav.adminOk') : t('nav.adminCheck') }}</span>
         </a>
-        <span class="version mono">Calme {{ version }}</span>
+        <span class="version mono">Calm {{ version }}</span>
       </div>
     </aside>
 

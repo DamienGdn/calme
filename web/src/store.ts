@@ -38,7 +38,7 @@ export const store = reactive({
 export interface Draft {
   mailId?: string;
   text?: string;
-  /** Open the editor and immediately ask Calme for free slots from the calendar. */
+  /** Open the editor and immediately ask Calm for free slots from the calendar. */
   slots?: boolean;
 }
 export const draft = ref<Draft>({});

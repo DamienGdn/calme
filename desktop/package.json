@@ -1,9 +1,9 @@
 {
   "name": "calme-desktop",
-  "productName": "Calme",
-  "version": "0.5.4",
+  "productName": "Calm",
+  "version": "0.6.0",
   "private": true,
-  "description": "Calme — your mail, without the noise.",
+  "description": "Calm — your mail, without the noise.",
   "main": "main.cjs",
   "scripts": {
     "start": "node scripts/bundle-server.mjs && electron .",
@@ -12,7 +12,7 @@
   },
   "build": {
     "appId": "app.calme.desktop",
-    "productName": "Calme",
+    "productName": "Calm",
     "directories": {
       "output": "out",
       "buildResources": "build"

@@ -1,18 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
+import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
 import CalendarView from './CalendarView.vue';
 import NewEvent from './NewEvent.vue';
 
-interface CalEvent {
-  title: string;
-  start: string;
-  end: string;
-  allDay: boolean;
+interface CalInfo {
+  id: string;
+  name: string;
+  color: string;
+  primary: boolean;
+  writable: boolean;
+}
+interface CalEvent extends OpenEvent {
+  calendar?: { id: string; name: string; color: string; primary: boolean };
 }
 interface Proposal {
   mailId: string;
@@ -23,35 +28,87 @@ interface Proposal {
   added: string | null;
 }
 interface Row {
-  /** Start and end times; for an all-day event, t1 is "All day" and t2 is empty. */
   t1: string;
   t2: string;
-  title: string;
-  tag: 'agenda' | 'proposed';
-  conflict: boolean;
+  ev: CalEvent;
+  kind: 'agenda' | 'proposed' | 'conflict';
 }
 
 const { t } = useI18n();
-const view = ref<{ connected: boolean; events: CalEvent[]; proposals: Proposal[] } | null>(null);
+const view = ref<{ connected: boolean; events: CalEvent[]; proposals: Proposal[]; calendars: CalInfo[]; limitedCalendars: boolean } | null>(null);
 const busy = ref<string | null>(null);
-const day = ref<string | null>(null);
 const form = ref(false);
+const opened = ref<OpenEvent | null>(null);
 const mode = ref<'liste' | 'semaine' | 'mois'>('liste');
 
 const load = () => api<typeof view.value>('/api/agenda').then((v) => (view.value = v)).catch(notifyError);
-onMounted(load);
 
 const localDay = (d: Date) => d.toLocaleDateString('sv-SE');
+const addDays = (k: string, n: number) => {
+  const d = new Date(k + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return localDay(d);
+};
 const time = (iso: string) => new Date(iso).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
 const longDay = (iso: string) => new Date(iso).toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short' });
-const fullDay = (k: string) => new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' });
+const todayKey = localDay(new Date());
+const calName = (c?: { name: string; primary: boolean }) => (c ? (c.primary ? t('agenda.mine') : c.name) : '');
+
+// Calendars shown (hidden ones are remembered on this device).
+const hidden = ref<Set<string>>(new Set());
+try {
+  hidden.value = new Set(JSON.parse(localStorage.getItem('calme.hiddenCalendars') ?? '[]') as string[]);
+} catch {
+  /* nothing remembered */
+}
+function toggleCal(id: string) {
+  const next = new Set(hidden.value);
+  if (!next.delete(id)) next.add(id);
+  hidden.value = next;
+  try {
+    localStorage.setItem('calme.hiddenCalendars', JSON.stringify([...next]));
+  } catch {
+    /* not remembered */
+  }
+}
+const shown = (e: CalEvent) => !e.calendar || !hidden.value.has(e.calendar.id);
+
+// List: every upcoming appointment, by month, loaded two months at a time.
+const listEvents = ref<CalEvent[] | null>(null);
+const until = ref(addDays(todayKey, 59));
+const loadingMore = ref(false);
+async function loadList(from: string, to: string, append = false) {
+  try {
+    const r = await api<{ events: CalEvent[] }>(`/api/agenda/range?from=${from}&to=${to}`);
+    listEvents.value = append ? [...(listEvents.value ?? []), ...r.events] : r.events;
+  } catch (e) {
+    if (!append) listEvents.value = [];
+    notifyError(e);
+  }
+}
+async function more() {
+  loadingMore.value = true;
+  const from = addDays(until.value, 1);
+  until.value = addDays(from, 59);
+  await loadList(from, until.value, true);
+  loadingMore.value = false;
+}
+const reload = () => {
+  void load();
+  if (view.value?.connected !== false) void loadList(todayKey, until.value);
+};
+onMounted(async () => {
+  await load();
+  if (view.value?.connected) void loadList(todayKey, until.value);
+  else listEvents.value = [];
+});
 
 async function add(p: Proposal) {
   busy.value = p.mailId;
   try {
     await post(`/api/mail/${encodeURIComponent(p.mailId)}/event`);
     notify(t('agenda.addedToast', { title: p.event.title }));
-    await load();
+    reload();
   } catch (e) {
     notifyError(e);
   } finally {
@@ -63,37 +120,47 @@ async function dismiss(p: Proposal) {
   await load();
 }
 
-const today = new Date();
-const days = Array.from({ length: 14 }, (_, i) => {
-  const d = new Date(today);
-  d.setDate(today.getDate() + i);
-  return d;
-});
-const rowsByDay = computed(() => {
-  const map = new Map<string, Row[]>();
-  const push = (k: string, r: Row) => map.set(k, [...(map.get(k) ?? []), r]);
-  for (const e of view.value?.events ?? []) {
-    if (e.allDay) push(e.start, { t1: t('agenda.allDay'), t2: '', title: e.title, tag: 'agenda', conflict: false });
-    else push(localDay(new Date(e.start)), { t1: time(e.start), t2: time(e.end), title: e.title, tag: 'agenda', conflict: false });
-  }
-  for (const p of view.value?.proposals ?? [])
-    if (!p.added) push(localDay(new Date(p.event.start)), { t1: time(p.event.start), t2: time(p.event.end), title: p.event.title, tag: 'proposed', conflict: Boolean(p.conflict) });
-  // Each day reads in time order (all-day first).
-  for (const rows of map.values()) rows.sort((a, b) => (a.t2 ? a.t1 : '') .localeCompare(b.t2 ? b.t1 : ''));
-  return map;
-});
 const pending = computed(() => (view.value?.proposals ?? []).filter((p) => !p.added));
 const conflicts = computed(() => pending.value.filter((p) => p.conflict).length);
-const visibleDays = computed(() => days.map(localDay).filter((k) => (rowsByDay.value.get(k)?.length ?? 0) > 0 && (!day.value || day.value === k)));
 const pendingEvents = computed(() => pending.value.map((p) => ({ title: p.event.title, start: p.event.start, end: p.event.end, conflict: Boolean(p.conflict) })));
-const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ? 'var(--hot)' : 'var(--accent)');
+
+/** Months → days → appointments, in reading order (all-day first, then by time). */
+const months = computed(() => {
+  const rows: { day: string; row: Row }[] = [];
+  for (const e of listEvents.value ?? []) {
+    if (!shown(e)) continue;
+    if (e.allDay) rows.push({ day: e.start < todayKey ? todayKey : e.start, row: { t1: t('agenda.allDay'), t2: '', ev: e, kind: 'agenda' } });
+    else rows.push({ day: localDay(new Date(e.start)), row: { t1: time(e.start), t2: time(e.end), ev: e, kind: 'agenda' } });
+  }
+  for (const p of pending.value) {
+    const ev: CalEvent = { title: p.event.title, start: p.event.start, end: p.event.end, allDay: false, location: p.event.location, fromMail: t('agenda.fromMail', { from: p.fromName, subject: p.subject }) };
+    rows.push({ day: localDay(new Date(p.event.start)), row: { t1: time(p.event.start), t2: time(p.event.end), ev, kind: p.conflict ? 'conflict' : 'proposed' } });
+  }
+  const byMonth = new Map<string, Map<string, Row[]>>();
+  for (const { day, row } of rows) {
+    if (day < todayKey || day > until.value) continue;
+    const m = byMonth.get(day.slice(0, 7)) ?? new Map<string, Row[]>();
+    m.set(day, [...(m.get(day) ?? []), row]);
+    byMonth.set(day.slice(0, 7), m);
+  }
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, days]) => ({
+      key,
+      label: new Date(key + '-15T12:00:00').toLocaleDateString(dateLocale(), { month: 'long', year: 'numeric' }),
+      days: [...days.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([day, list]) => ({ day, rows: list.sort((x, y) => Number(y.ev.allDay) - Number(x.ev.allDay) || x.ev.start.localeCompare(y.ev.start)) })),
+    }));
+});
+const writable = computed(() => (view.value?.calendars ?? []).filter((c) => c.writable));
+watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(todayKey, until.value));
 </script>
 
 <template>
   <header class="topbar">
     <span class="eyebrow">{{ t('agenda.eyebrow') }}</span>
-    <a class="btn" href="https://calendar.google.com" target="_blank" rel="noopener noreferrer" :aria-label="t('agenda.openGoogle')"><span class="wide-only">{{ t('agenda.openGoogle') }}</span><span class="phone-only">Google ↗</span></a>
-    <button type="button" class="btn btn-prim" :aria-expanded="form" :aria-label="t('agenda.newEvent')" @click="form = !form"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
+    <button type="button" class="btn btn-prim" :aria-label="t('agenda.newEvent')" @click="form = true"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
   </header>
 
   <h1 class="headline" style="max-width: 18ch">
@@ -101,53 +168,45 @@ const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ?
       <span class="hot">{{ t('agenda.headlineFound', pending.length) }}</span> {{ t('agenda.headlineIn') }}
       <em>{{ conflicts === 0 ? t('agenda.noConflict') : conflicts === 1 ? t('agenda.oneConflict') : t('agenda.conflicts', { n: conflicts }) }}</em>
     </template>
-    <template v-else>{{ t('agenda.fortnight') }} <em>{{ t('agenda.fortnightEm') }}</em></template>
+    <template v-else>{{ t('agenda.ahead') }} <em>{{ t('agenda.aheadEm') }}</em></template>
   </h1>
 
   <div v-if="view && !view.connected" class="banner">
     <p>{{ t('agenda.notConnected') }}</p>
     <a class="btn btn-prim" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.connect') }}</a>
   </div>
-
-  <NewEvent v-if="form" @done="form = false; load()" />
-
-  <div class="tones" role="radiogroup" :aria-label="t('agenda.view')" style="align-self: flex-start">
-    <button v-for="m in (['liste', 'semaine', 'mois'] as const)" :key="m" type="button" role="radio" :aria-checked="mode === m" style="min-height: 40px" @click="mode = m">
-      {{ t(`agenda.views.${m}`) }}
-    </button>
+  <div v-else-if="view?.limitedCalendars" class="banner">
+    <p>{{ t('agenda.limited') }}</p>
+    <a class="btn" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.reconnect') }}</a>
   </div>
 
-  <CalendarView v-if="mode !== 'liste'" :key="mode" :mode="mode" :pending="pendingEvents" />
+  <NewEvent v-if="form" :calendars="writable" @close="form = false" @done="form = false; reload()" />
+  <EventSheet v-if="opened" :event="opened" @close="opened = null" />
 
-  <template v-else>
-    <div class="strip" role="list" :aria-label="t('agenda.next14')">
-      <button
-        v-for="(d, i) in days"
-        :key="localDay(d)"
-        type="button"
-        role="listitem"
-        :class="['strip-day', { today: i === 0 }]"
-        :aria-pressed="day === localDay(d)"
-        :aria-label="`${fullDay(localDay(d))} : ${t('agenda.items', rowsByDay.get(localDay(d))?.length ?? 0)}`"
-        @click="day = day === localDay(d) ? null : localDay(d)"
-      >
-        <span class="mono wd">{{ d.toLocaleDateString(dateLocale(), { weekday: 'short' }) }}</span>
-        <span class="serif n">{{ d.getDate() }}</span>
-        <span class="dots" aria-hidden="true">
-          <i v-for="(r, j) in (rowsByDay.get(localDay(d)) ?? []).slice(0, 3)" :key="j" :style="{ background: dotColor(r) }" />
-        </span>
+  <div class="agenda-tools">
+    <div class="tones" role="radiogroup" :aria-label="t('agenda.view')">
+      <button v-for="m in (['liste', 'semaine', 'mois'] as const)" :key="m" type="button" role="radio" :aria-checked="mode === m" style="min-height: 40px" @click="mode = m">
+        {{ t(`agenda.views.${m}`) }}
       </button>
     </div>
+    <div v-if="(view?.calendars.length ?? 0) > 1" class="cal-chips" role="group" :aria-label="t('agenda.calendars')">
+      <button v-for="c in view?.calendars ?? []" :key="c.id" type="button" class="cal-chip" :aria-pressed="!hidden.has(c.id)" @click="toggleCal(c.id)">
+        <i :style="{ background: c.color }" aria-hidden="true" /> {{ c.primary ? t('agenda.mine') : c.name }}
+      </button>
+    </div>
+  </div>
 
-    <div style="display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
-      <section aria-labelledby="found" style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
-        <h2 id="found" class="eyebrow" style="margin: 0; font-weight: 500">{{ t('agenda.found') }}</h2>
+  <CalendarView v-if="mode !== 'liste'" :key="mode" :mode="mode" :pending="pendingEvents" :hidden="[...hidden]" @open="(e) => (opened = e)" />
+
+  <template v-else>
+    <section v-if="view?.proposals.length" aria-labelledby="found" class="found">
+      <h2 id="found" class="eyebrow" style="margin: 0; font-weight: 500">{{ t('agenda.found') }}</h2>
         <article v-for="(p, i) in view?.proposals ?? []" :key="p.mailId" class="proposal rise" :style="{ animationDelay: `${i * 60}ms`, borderColor: p.conflict ? 'var(--hot)' : undefined }">
           <span class="eyebrow" style="display: flex; align-items: center; gap: 8px">
             <span aria-hidden="true" :style="{ width: '8px', height: '8px', borderRadius: '2px', background: p.conflict ? 'var(--hot)' : 'var(--accent)' }" />
             {{ longDay(p.event.start) }} · {{ time(p.event.start) }}–{{ time(p.event.end) }}
           </span>
-          <span class="serif" style="font-size: 26px; line-height: 1.05">{{ p.event.title }}</span>
+          <span class="serif" style="font-size: 21px; line-height: 1.05">{{ p.event.title }}</span>
           <span v-if="p.event.location" class="muted" style="font-size: 13px">{{ p.event.location }}</span>
           <span style="font-size: 13px; color: var(--body)">{{ t('agenda.fromMail', { from: p.fromName, subject: p.subject }) }}</span>
           <span v-if="p.conflict" class="warn">{{ t('agenda.overlaps', { title: p.conflict }) }}</span>
@@ -160,31 +219,43 @@ const dotColor = (r: Row) => (r.tag === 'agenda' ? 'var(--muted)' : r.conflict ?
             </template>
           </span>
         </article>
-        <p v-if="view && !view.proposals.length" class="empty" style="padding: 12px 0">{{ t('agenda.nothingNew') }}</p>
-      </section>
+    </section>
 
-      <section aria-labelledby="days" style="flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
-        <h2 id="days" class="eyebrow" style="margin: 0; font-weight: 500">{{ t('agenda.yourAgenda') }}{{ day ? ` · ${fullDay(day)}` : '' }}</h2>
-        <div class="timeline">
-          <div v-for="k in visibleDays" :key="k" :class="['tl-day', { today: k === localDay(today) }]">
+    <section class="months" :aria-label="t('agenda.yourAgenda')">
+      <p v-if="listEvents === null" class="empty">{{ t('common.loading') }}</p>
+      <div v-for="m in months" :key="m.key" class="month-block">
+        <h2 class="month-title">{{ m.label }}</h2>
+        <div class="timeline carnet">
+          <div v-for="d in m.days" :key="d.day" :class="['tl-day', { today: d.day === todayKey }]">
             <div class="tl-date">
-              <span class="tl-n">{{ new Date(k + 'T12:00:00').getDate() }}</span>
-              <span class="tl-wd">{{ k === localDay(today) ? t('common.today') : new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' }) }}</span>
-              <span class="eyebrow" style="padding: 0">{{ new Date(k + 'T12:00:00').toLocaleDateString(dateLocale(), { month: 'long' }) }}</span>
+              <span class="tl-n">{{ new Date(d.day + 'T12:00:00').getDate() }}</span>
+              <span class="tl-wd">{{ d.day === todayKey ? t('common.today') : new Date(d.day + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'long' }) }}</span>
             </div>
             <div class="tl-evs">
-              <div v-for="(r, j) in rowsByDay.get(k)" :key="j" :class="['tl-ev', { prop: r.tag !== 'agenda', conflict: r.conflict }]">
+              <button
+                v-for="(r, j) in d.rows"
+                :key="j"
+                type="button"
+                :class="['tl-ev', r.kind, { prop: r.kind !== 'agenda', conflict: r.kind === 'conflict' }]"
+                :style="r.ev.calendar ? { '--cal': r.ev.calendar.color } : undefined"
+                @click="opened = r.ev"
+              >
                 <span class="mono muted tl-time"><span>{{ r.t1 }}</span><span v-if="r.t2" class="tl-t2">{{ r.t2 }}</span></span>
-                <span style="font-size: 15px">{{ r.title }}</span>
-                <span class="mono tag">{{ r.tag === 'agenda' ? t('agenda.tagAgenda') : t('agenda.tagProposed') }}</span>
-              </div>
+                <span class="tl-main">
+                  <span class="tl-title">{{ r.ev.title }}</span>
+                  <span class="tl-cal">
+                    <template v-if="r.kind === 'agenda'"><i :style="{ background: r.ev.calendar?.color }" aria-hidden="true" /> {{ calName(r.ev.calendar) }}</template>
+                    <template v-else>{{ t('agenda.tagProposed') }}</template>
+                    <template v-if="r.ev.location"> · {{ r.ev.location }}</template>
+                  </span>
+                </span>
+              </button>
             </div>
           </div>
-          <p v-if="view && !visibleDays.length" class="empty">{{ t('agenda.nothingPlanned') }}</p>
-          <p v-if="!view" class="empty">{{ t('common.loading') }}</p>
         </div>
-        <p class="muted" style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px"><span class="dot" aria-hidden="true" /> {{ t('agenda.calmeUses') }}</p>
-      </section>
-    </div>
+      </div>
+      <p v-if="listEvents !== null && !months.length" class="empty">{{ t('agenda.nothingPlanned') }}</p>
+      <button v-if="view?.connected" type="button" class="btn" style="align-self: flex-start" :disabled="loadingMore" @click="more">{{ loadingMore ? t('common.loading') : t('agenda.more') }}</button>
+    </section>
   </template>
 </template>

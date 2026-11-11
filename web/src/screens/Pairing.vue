@@ -5,7 +5,7 @@ import { api, setToken, Unauthorized } from '../api.ts';
 import { store } from '../store.ts';
 
 /**
- * Pairs this screen. Usual way: ask for access, the user accepts on the computer running Calme, the token arrives.
+ * Pairs this screen. Usual way: ask for access, the user accepts on the computer running Calm, the token arrives.
  * Fallback: paste the token (`pnpm calme pair`).
  */
 const { t } = useI18n();
@@ -76,7 +76,7 @@ onBeforeUnmount(() => window.clearInterval(timer));
   <div class="pairing">
     <div class="rise pair-box">
       <div class="logo" aria-hidden="true">c.</div>
-      <h1 class="headline" style="font-size: 52px">{{ t('pairing.title') }} <em>{{ t('pairing.titleEm') }}</em></h1>
+      <h1 class="headline" style="font-size: 40px">{{ t('pairing.title') }} <em>{{ t('pairing.titleEm') }}</em></h1>
       <p class="muted" style="margin: 0; line-height: 1.6">{{ t('pairing.help') }}</p>
 
       <div v-if="waiting" class="pair-wait" role="status">

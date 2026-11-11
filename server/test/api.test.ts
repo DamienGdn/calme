@@ -64,6 +64,14 @@ function setup(gmailConnected = true) {
     runCycle: async () => {},
     status: () => ({ running: false, error: null }),
     calendar: () => ({
+      calendars: async () => ({
+        list: [
+          { id: 'primary-id', name: 'moi@exemple.fr', color: '#039be5', primary: true, writable: true },
+          { id: 'famille-id', name: 'Famille', color: '#f6bf26', primary: false, writable: true },
+          { id: 'feries-id', name: 'Jours fériés en France', color: '#0b8043', primary: false, writable: false },
+        ],
+        limited: false,
+      }),
       upcoming: async () => [{ title: 'Dentiste', start: '2026-11-14T10:00:00+01:00', end: '2026-11-14T11:00:00+01:00', allDay: false }],
       range: async (from: string, to: string) => [{ title: `Du ${from.slice(0, 10)} au ${to.slice(0, 10)}`, start: '2026-12-01', end: '2026-12-02', allDay: true }],
       create: async (e) => {
@@ -77,6 +85,16 @@ function setup(gmailConnected = true) {
     claudeTest: async () => ({ ok: true, ms: 1200 }),
     fetchImpl: async (url, init) => {
       fetched.push({ url: String(url), init });
+      if (String(url).startsWith('https://data.geopf.fr/geocodage/search')) {
+        if (String(url).includes('panne')) return new Response('{"message":"The upstream server is timing out"}', { status: 504 });
+        return Response.json({
+          type: 'FeatureCollection',
+          features: [
+            { geometry: { type: 'Point', coordinates: [2.3367, 48.8617] }, properties: { label: '10 Rue de Rivoli 75004 Paris', name: '10 Rue de Rivoli', postcode: '75004', city: 'Paris', context: '75, Paris, Île-de-France', type: 'housenumber', score: 0.9 } },
+            { geometry: { type: 'Point', coordinates: [2.35, 48.85] }, properties: { label: 'Rue de Rivoli 75001 Paris', name: 'Rue de Rivoli', postcode: '75001', city: 'Paris', context: '75, Paris, Île-de-France', type: 'street', score: 0.8 } },
+          ],
+        });
+      }
       return new Response('ok');
     },
   });
@@ -143,7 +161,7 @@ describe('api actions', () => {
     expect(store.getMail('a')?.id).toBe('a');
   });
 
-  it('refuses to untrash a mail Calme never had', async () => {
+  it('refuses to untrash a mail Calm never had', async () => {
     const { app, g } = setup();
     expect((await app.request('/api/mail/zzz/untrash', { method: 'POST', headers: auth })).status).toBe(404);
     expect(g.calls.some((c) => c.method === 'untrash')).toBe(false);
@@ -242,7 +260,7 @@ describe('api calendar', () => {
     const post = (b: unknown) => app.request('/api/agenda/events', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
     const ok = await post({ title: 'Garage', start: '2026-11-20T09:00:00+01:00', end: '2026-11-20T10:00:00+01:00', location: 'Rennes' });
     expect(await ok.json()).toEqual({ link: 'https://calendar.google.com/event?eid=x' });
-    expect(created.at(-1)).toEqual({ title: 'Garage', start: '2026-11-20T09:00:00+01:00', end: '2026-11-20T10:00:00+01:00', location: 'Rennes' });
+    expect(created.at(-1)).toEqual({ title: 'Garage', start: '2026-11-20T09:00:00+01:00', end: '2026-11-20T10:00:00+01:00', location: 'Rennes', allDay: false });
     expect((await post({ title: 'X', start: '2026-11-20T10:00:00+01:00', end: '2026-11-20T09:00:00+01:00' })).status).toBe(400);
     expect((await post({ title: '', start: '2026-11-20T09:00:00+01:00', end: '2026-11-20T10:00:00+01:00' })).status).toBe(400);
   });
@@ -378,7 +396,7 @@ describe('api contacts and compose', () => {
     expect(list).toEqual([expect.objectContaining({ email: 'sophie@x.fr', name: 'Sophie Martin' })]);
   });
 
-  it('lets Calme write a new mail from a short brief', async () => {
+  it('lets Calm write a new mail from a short brief', async () => {
     const { app } = setup();
     const res = await app.request('/api/compose', {
       method: 'POST',
@@ -527,7 +545,7 @@ describe('web app manifest', () => {
     const { res, body } = await manifest();
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('application/manifest+json');
-    expect(body).toMatchObject({ name: 'Calme', display: 'standalone', start_url: '/' });
+    expect(body).toMatchObject({ name: 'Calm', display: 'standalone', start_url: '/' });
   });
 
   it('carries the pairing into the home-screen app when the paired page asks with the right token', async () => {
@@ -568,7 +586,7 @@ describe('pairing a screen from afar (iPhone home-screen app)', () => {
     expect(await look(app, id)).toEqual({ status: 'expired' });
   });
 
-  it('only the computer running Calme can approve', async () => {
+  it('only the computer running Calm can approve', async () => {
     const { app } = setup();
     const { id } = await ask(app);
     expect((await decide(app, id, true, undefined, { 'x-forwarded-for': '100.64.0.2' })).status).toBe(403);
@@ -672,5 +690,72 @@ describe('mark a mail as handled', () => {
     const { app } = setup();
     expect((await put(app, 'a', 'spam')).status).toBe(400);
     expect((await put(app, 'zzz', 'read')).status).toBe(404);
+  });
+});
+
+describe('address search (Géoplateforme)', () => {
+  it('suggests French addresses as you type', async () => {
+    const { app, fetched } = setup();
+    const r = await (await app.request('/api/address?q=10%20rue%20de%20rivoli', { headers: auth })).json();
+    expect(r[0]).toEqual({ label: '10 Rue de Rivoli 75004 Paris', name: '10 Rue de Rivoli', postcode: '75004', city: 'Paris', context: '75, Paris, Île-de-France', lat: 48.8617, lon: 2.3367 });
+    expect(r).toHaveLength(2);
+    const url = new URL(fetched.at(-1)!.url);
+    expect(url.origin + url.pathname).toBe('https://data.geopf.fr/geocodage/search');
+    expect(url.searchParams.get('q')).toBe('10 rue de rivoli');
+    expect(url.searchParams.get('autocomplete')).toBe('1');
+  });
+
+  it('asks nothing for less than 3 characters', async () => {
+    const { app, fetched } = setup();
+    expect(await (await app.request('/api/address?q=ri', { headers: auth })).json()).toEqual([]);
+    expect(fetched.some((f) => f.url.includes('geopf'))).toBe(false);
+  });
+
+  it('says so when the service is down, so the address can be typed by hand', async () => {
+    const { app } = setup();
+    expect((await app.request('/api/address?q=rue%20en%20panne', { headers: auth })).status).toBe(502);
+  });
+});
+
+describe('full appointment form', () => {
+  const post = (app: ReturnType<typeof setup>['app'], b: unknown) =>
+    app.request('/api/agenda/events', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+
+  it('creates an appointment with notes and a reminder', async () => {
+    const { app, created } = setup();
+    const ok = await post(app, { title: 'Notaire', start: '2026-11-20T18:00:00+01:00', end: '2026-11-20T19:00:00+01:00', location: '10 Rue de Rivoli 75004 Paris', description: 'Apporter le permis', reminderMin: 30 });
+    expect(ok.status).toBe(200);
+    expect(created.at(-1)).toEqual({ title: 'Notaire', start: '2026-11-20T18:00:00+01:00', end: '2026-11-20T19:00:00+01:00', location: '10 Rue de Rivoli 75004 Paris', description: 'Apporter le permis', reminderMin: 30, allDay: false });
+  });
+
+  it('creates an all-day appointment over several days (end day excluded)', async () => {
+    const { app, created } = setup();
+    expect((await post(app, { title: 'Vacances en Corse', allDay: true, start: '2026-12-21', end: '2026-12-28' })).status).toBe(200);
+    expect(created.at(-1)).toMatchObject({ title: 'Vacances en Corse', allDay: true, start: '2026-12-21', end: '2026-12-28' });
+    expect((await post(app, { title: 'X', allDay: true, start: '2026-12-21', end: '2026-12-21' })).status).toBe(400);
+  });
+
+  it('refuses a reminder that is not one of the offered ones', async () => {
+    const { app } = setup();
+    expect((await post(app, { title: 'X', start: '2026-11-20T18:00:00+01:00', end: '2026-11-20T19:00:00+01:00', reminderMin: 7 })).status).toBe(400);
+  });
+});
+
+describe('several calendars', () => {
+  it('lists the calendars with the agenda, and says when Google limits Calm to the main one', async () => {
+    const { app } = setup();
+    const body = await (await app.request('/api/agenda', { headers: auth })).json();
+    expect(body.calendars.map((c: { name: string }) => c.name)).toEqual(['moi@exemple.fr', 'Famille', 'Jours fériés en France']);
+    expect(body.limitedCalendars).toBe(false);
+  });
+
+  it('adds an appointment to the chosen calendar, only one Calm may write to', async () => {
+    const { app, created } = setup();
+    const post = (b: unknown) => app.request('/api/agenda/events', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+    const base = { title: 'Repas', start: '2026-11-22T12:00:00+01:00', end: '2026-11-22T14:00:00+01:00' };
+    expect((await post({ ...base, calendarId: 'famille-id' })).status).toBe(200);
+    expect(created.at(-1)).toMatchObject({ calendarId: 'famille-id' });
+    expect((await post({ ...base, calendarId: 'feries-id' })).status).toBe(400);
+    expect((await post({ ...base, calendarId: 'inconnu' })).status).toBe(400);
   });
 });

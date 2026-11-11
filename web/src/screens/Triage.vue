@@ -70,7 +70,7 @@ const phone = useMedia('(max-width: 720px)');
 
 /**
  * Opening a mail on the phone adds a history step, so the system back gesture (and the swipe below) returns to the
- * list instead of leaving Calme.
+ * list instead of leaving Calm.
  */
 function openReading() {
   if (phone.value && !reading.value) history.pushState({ calmeReading: true }, '');

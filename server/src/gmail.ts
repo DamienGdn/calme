@@ -7,6 +7,8 @@ import { createThrottle } from './throttle.ts';
 
 export const SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/calendar.events',
+  // Read the list of the user's calendars (to show all of them, not just the main one).
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
 ];
 
 export interface GmailPort {
@@ -97,7 +99,7 @@ function isRateLimit(e: unknown): boolean {
 export const COST = { list: 5, getFull: 60, getMeta: 20, modify: 5, trash: 20, untrash: 20, attachment: 5, send: 100, labels: 1, profile: 1 } as const;
 const take = createThrottle(5000);
 
-/** Gmail's own per-user limit, shown in the quota gauge (Calme keeps below its 5,000-unit budget). */
+/** Gmail's own per-user limit, shown in the quota gauge (Calm keeps below its 5,000-unit budget). */
 export const GMAIL_USER_LIMIT = 6000;
 export const quotaUsage = () => ({ ...take.usage(), limit: GMAIL_USER_LIMIT });
 

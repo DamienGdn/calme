@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Calme — your Gmail, sorted by AI. Powered by Claude." width="100%" />
+  <img src="docs/assets/banner.png" alt="Calm — your Gmail, sorted by AI. Powered by Claude." width="100%" />
 </p>
 
 <p align="center">
@@ -10,37 +10,37 @@
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-0D0E11?style=flat-square" /></a>
 </p>
 
-# Calme
+# Calm
 
-**Calme sorts your Gmail with Claude so you can stop living in your inbox.** It fetches your mail, sorts every message
+**Calm sorts your Gmail with Claude so you can stop living in your inbox.** It fetches your mail, sorts every message
 (*to answer*, *to read*, *newsletters*, *to delete*), summarises it, drafts replies, spots appointments, suggests what
-to delete and which newsletters to drop. You decide; Calme does it. **Nothing is sent, deleted or unsubscribed
+to delete and which newsletters to drop. You decide; Calm does it. **Nothing is sent, deleted or unsubscribed
 without your click.**
 
 It runs on your own computer and uses **your Claude Code subscription** (`claude -p`) — no API key, no cloud of ours.
 
-![Calme](docs/assets/screenshot.jpg)
+![Calm](docs/assets/screenshot.jpg)
 
 ## Features
 
 - **Smart triage** — every mail sorted into 4 categories with a short summary and a suggested action.
 - **Ready replies** — up to 3 drafts per mail in the right tone; rewrite with one sentence ("shorter", "more formal").
-- **Write with Calme** — describe what you want to say, Calme writes the mail; To/Cc autocomplete from your contacts.
+- **Write with Calm** — describe what you want to say, Calm writes the mail; To/Cc autocomplete from your contacts.
 - **Calendar** — appointments found in mail, clash detection, one-click "add to calendar", free-slot suggestions, list/week/month views.
 - **Clean-up** — promotions, notifications and stale mail grouped for one-click trashing (Gmail trash, recoverable 30 days).
-- **Newsletter advisor** — Calme reads your reading habits and tells you which newsletters to unsubscribe from; optional automatic mode.
-- **AI search** — ask a question in plain language; Calme searches a local full-text copy of your mail and Gmail, then answers.
+- **Newsletter advisor** — Calm reads your reading habits and tells you which newsletters to unsubscribe from; optional automatic mode.
+- **AI search** — ask a question in plain language; Calm searches a local full-text copy of your mail and Gmail, then answers.
 - **Local mail base** — your received and sent mail mirrored on your computer (SQLite FTS5), synced at every fetch.
 - **Everywhere** — desktop app for macOS, Windows and Linux (menu bar icon, notifications, starts at login) and an
   iPhone home-screen app with push notifications.
-- **English and French** — switch in *Admin*; Calme's own texts (summaries, replies, notifications) follow.
+- **English and French** — switch in *Admin*; Calm's own texts (summaries, replies, notifications) follow.
 - **Gmail quota-aware** — a live gauge and a throttle that keeps you under Google's per-minute limit.
 
 ## How it works
 
 ```
  iPhone (PWA) ──┐                         ┌── Gmail API / Google Calendar API
- Desktop app ───┼── Calme server ─────────┤
+ Desktop app ───┼── Calm server ─────────┤
  Browser ───────┘   127.0.0.1:4747        └── claude -p  (your Claude Code subscription,
                     SQLite in ~/.calme                    no tools, JSON-schema answers)
 ```
@@ -66,28 +66,28 @@ The installers are **not code-signed** (signing costs a yearly fee that this sid
 Windows warn you the first time. This is expected; you only do it once.
 
 **macOS** (Sequoia 15 and later)
-1. Open the `.dmg` and drag **Calme** onto **Applications**.
-2. Open Calme from Applications. macOS says it *could not verify* Calme: click **Done** (not *Move to Bin*).
-3. Open **System Settings › Privacy & Security**, scroll to *Security*: next to *“Calme” was blocked…*, click
+1. Open the `.dmg` and drag **Calm** onto **Applications**.
+2. Open Calm from Applications. macOS says it *could not verify* Calm: click **Done** (not *Move to Bin*).
+3. Open **System Settings › Privacy & Security**, scroll to *Security*: next to *“Calm” was blocked…*, click
    **Open Anyway**, confirm with your password or Touch ID, then **Open**.
-4. From now on Calme opens normally.
+4. From now on Calm opens normally.
 
-On macOS 14 or earlier, right-click Calme in Applications › **Open** › **Open** is enough. If macOS ever says Calme
+On macOS 14 or earlier, right-click Calm in Applications › **Open** › **Open** is enough. If macOS ever says Calm
 *is damaged and can't be opened* (the quarantine flag of the download), run once in Terminal:
-`xattr -dr com.apple.quarantine /Applications/Calme.app`.
+`xattr -dr com.apple.quarantine /Applications/Calm.app`.
 
 **Windows** (10 and 11)
 1. If your browser flags the download, keep it (Edge: *…* › *Keep* › *Show more* › *Keep anyway*).
-2. Run `Calme.Setup.x.y.z.exe`. On the blue *Windows protected your PC* screen, click **More info**, then
+2. Run `Calm.Setup.x.y.z.exe`. On the blue *Windows protected your PC* screen, click **More info**, then
    **Run anyway**.
-3. The installer sets Calme up for your user and opens it.
+3. The installer sets Calm up for your user and opens it.
 
-If Windows 11 *Smart App Control* is on, it blocks unsigned apps with no way around it; run Calme from source instead
+If Windows 11 *Smart App Control* is on, it blocks unsigned apps with no way around it; run Calm from source instead
 (below) — turning Smart App Control off cannot be undone without reinstalling Windows.
 
-**Linux** — `chmod +x Calme-*.AppImage` and run it.
+**Linux** — `chmod +x Calm-*.AppImage` and run it.
 
-The app runs the Calme server in the background, starts at login (toggle in the menu bar icon menu), shows the number
+The app runs the Calm server in the background, starts at login (toggle in the menu bar icon menu), shows the number
 of mails to answer in the menu bar and notifies you of every new mail. Logs: `~/.calme/server.log`.
 
 ### 3. Connect Gmail (once, ~10 minutes)
@@ -104,24 +104,24 @@ Google requires every app to have its own OAuth client. It is free.
 5. *Clients › Create client*: type **Desktop app**. Download the JSON.
 6. Drop the JSON into the setup assistant (or save it as `~/.calme/credentials.json`;
    Windows: `C:\Users\<you>\.calme\credentials.json`), then click **Connect Gmail**: your browser opens Google's
-   consent page, and Calme moves on by itself once you accept.
+   consent page, and Calm moves on by itself once you accept.
 
 **Stay connected for good.** While the app is in *Testing*, Google signs you out every 7 days. To avoid that, publish
 it: in *Branding*, fill *Application home page* (e.g. `https://github.com/DamienGdn/calme`) and *Privacy policy*
 (e.g. this repository's [`PRIVACY.md`](PRIVACY.md)), save, then *Audience › Publish app*. You don't need Google's
 verification for your own use: the consent page shows *Google hasn't verified this app* — click *Advanced* ›
-*Go to Calme (unsafe)* — and the app is limited to 100 users. Reconnect once after publishing (*Admin*).
+*Go to Calm (unsafe)* — and the app is limited to 100 users. Reconnect once after publishing (*Admin*).
 
-Calme asks for three permissions: read and organise mail (`gmail.modify` — no permanent deletion possible), send mail
+Calm asks for three permissions: read and organise mail (`gmail.modify` — no permanent deletion possible), send mail
 (`gmail.send`) and read/create calendar events (`calendar.events`). Tokens stay in `~/.calme/`, readable by you only.
 
 ### 4. iPhone
 
 1. Install [Tailscale](https://tailscale.com) on the computer and the iPhone (same account); enable MagicDNS and HTTPS.
-2. In Calme on the computer: *Admin › iPhone › Share Calme with my iPhone*. Calme becomes reachable at
+2. In Calm on the computer: *Admin › iPhone › Share Calm with my iPhone*. Calm becomes reachable at
    `https://<computer>.<tailnet>.ts.net`, **only from your own devices**, and shows a QR code.
-3. Scan it with the iPhone camera: Safari opens Calme already paired. *Share* › *Add to Home Screen*.
-4. Open Calme from the icon, then *Enable notifications* (choose what to receive in *Admin › Notifications*).
+3. Scan it with the iPhone camera: Safari opens Calm already paired. *Share* › *Add to Home Screen*.
+4. Open Calm from the icon, then *Enable notifications* (choose what to receive in *Admin › Notifications*).
 
 ## Run from source
 
@@ -146,7 +146,7 @@ Actions builds macOS, Windows and Linux installers and attaches them to a releas
 
 ### With Claude Code
 
-This repository is set up for Claude Code (`CLAUDE.md`). Two slash commands drive Calme from your terminal:
+This repository is set up for Claude Code (`CLAUDE.md`). Two slash commands drive Calm from your terminal:
 `/tri` (fetch, sort and summarise what needs an answer) and `/menage` (prepare the clean-up). CLI:
 `pnpm calme status | list [reply|read|news|trash] | sync | triage | cycle | pair`.
 

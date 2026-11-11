@@ -11,10 +11,12 @@ export interface BackupFile {
 
 const PATTERN = /^calme-\d{4}-\d{2}-\d{2}\.db$/;
 
-/** iCloud Drive › Calme when iCloud Drive exists (macOS), else ~/.calme/backups. */
+/** iCloud Drive › Calm when iCloud Drive exists (macOS; the older "Calme" folder if it is already there), else ~/.calme/backups. */
 export function defaultBackupDir(home: string): string {
   const icloud = join(homedir(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs');
-  return existsSync(icloud) ? join(icloud, 'Calme') : join(home, 'backups');
+  if (!existsSync(icloud)) return join(home, 'backups');
+  const before = join(icloud, 'Calme');
+  return existsSync(before) ? before : join(icloud, 'Calm');
 }
 
 /** Consistent snapshot of the live database (SQLite VACUUM INTO), one file per day. */

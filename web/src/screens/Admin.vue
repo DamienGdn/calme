@@ -51,7 +51,7 @@ const { t, locale } = useI18n();
 const v = ref<AdminView | null>(null);
 const test = ref<{ ok: boolean; ms: number; error?: string } | 'running' | null>(null);
 const keep = ref('');
-// Restore and Tailscale changes are only allowed from the computer running Calme.
+// Restore and Tailscale changes are only allowed from the computer running Calm.
 const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 const SCOPE_KEY: Record<string, string> = {
   'https://www.googleapis.com/auth/gmail.modify': 'admin.scope.modify',
@@ -169,7 +169,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
 
       <section class="card" aria-labelledby="a-app">
         <h2 id="a-app">{{ t('admin.app') }}</h2>
-        <span class="status ok"><span class="dot" aria-hidden="true" /> Calme <span class="mono">{{ version }}</span></span>
+        <span class="status ok"><span class="dot" aria-hidden="true" /> Calm <span class="mono">{{ version }}</span></span>
         <div style="display: flex; flex-direction: column; gap: 6px">
           <span id="a-theme" class="eyebrow">{{ t('admin.theme') }}</span>
           <div class="tones" role="radiogroup" aria-labelledby="a-theme" style="align-self: flex-start; max-width: 100%">

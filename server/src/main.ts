@@ -38,7 +38,7 @@ if (existsSync(webDist)) {
 }
 
 serve({ fetch: app.fetch, hostname: '127.0.0.1', port: rt.cfg.port }, () => {
-  console.log(`Calme écoute sur http://127.0.0.1:${rt.cfg.port}`);
+  console.log(`Calm écoute sur http://127.0.0.1:${rt.cfg.port}`);
   console.log(`Jeton d’appairage : pnpm calme pair`);
   if (!rt.oauth.hasCredentials()) console.log(`Gmail : dépose credentials.json dans ${rt.cfg.home} (voir README)`);
   else if (!rt.oauth.isConnected()) console.log(`Gmail : ouvre http://127.0.0.1:${rt.cfg.port}/auth/google sur ce PC`);

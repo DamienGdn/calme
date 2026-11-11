@@ -1,4 +1,4 @@
-# Calme
+# Calm
 
 Gmail triage driven by Claude. The server (`server/`) runs on the always-on computer and listens on `127.0.0.1:4747`;
 `web/` is the Vue 3 + TypeScript UI (also a PWA, used on iPhone); `desktop/` is the Electron app (embeds the server,

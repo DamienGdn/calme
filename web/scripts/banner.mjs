@@ -11,7 +11,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   ${dots.join('')}
   <rect x="96" y="118" width="184" height="184" rx="42" fill="#C8F03C"/>
   <text x="184" y="252" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="124" fill="#0D0E11">c.</text>
-  <text x="328" y="214" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-size="112" fill="#EDEBE5">Calme</text>
+  <text x="328" y="214" font-family="Georgia, 'Times New Roman', serif" font-size="108" letter-spacing="-2" fill="#EDEBE5">Calm<tspan fill="#C8F03C">.</tspan></text>
   <text x="332" y="270" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" fill="#9C9BA3">Your Gmail, sorted by AI. <tspan fill="#FF9152">Without the noise.</tspan></text>
   <g transform="translate(332 300)">
     <rect width="250" height="42" rx="21" fill="none" stroke="#C8F03C" stroke-width="2"/>

@@ -22,7 +22,7 @@ const clean = (s: string) => s.replace(/[\r\n|]+/g, ' ').replace(/<\s*\/?\s*mail
 
 /**
  * AI search over the whole mailbox: Claude turns the question into Gmail search syntax,
- * Calme runs it (headers only), then Claude answers from what was found.
+ * Calm runs it (headers only), then Claude answers from what was found.
  */
 export async function searchMail(
   r: ClaudeRunner,

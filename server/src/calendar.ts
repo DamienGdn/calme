@@ -1,19 +1,52 @@
 import { calendar as calendarApi } from '@googleapis/calendar';
 import type { OAuth2Client } from 'google-auth-library';
 import { GmailDisconnected } from './gmail.ts';
+import { htmlToText } from './mime.ts';
 import type { ProposedEvent } from './types.ts';
+
+/** One of the user's Google calendars. */
+export interface CalInfo {
+  id: string;
+  name: string;
+  color: string;
+  primary: boolean;
+  /** Calm may add appointments to it (owner or writer). */
+  writable: boolean;
+}
 
 export interface CalEvent {
   title: string;
   start: string;
   end: string;
   allDay: boolean;
+  /** Details shown when the appointment is opened. */
+  id?: string;
+  location?: string | null;
+  description?: string | null;
+  link?: string | null;
+  /** The calendar the event belongs to. */
+  calendar?: { id: string; name: string; color: string; primary: boolean };
 }
 
+/** An appointment to create. All-day: start and end are days (YYYY-MM-DD), the end day excluded, as Google wants. */
+export interface NewEvent extends ProposedEvent {
+  allDay?: boolean;
+  /** Target calendar (the main one when absent). */
+  calendarId?: string;
+  description?: string;
+  /** Popup reminder, minutes before the start. */
+  reminderMin?: number;
+}
+
+/** Reminders the appointment form offers. */
+export const REMINDERS = [10, 30, 60, 1440];
+
 export interface CalendarPort {
+  /** The user's calendars; `limited` when Google only lets Calm see the main one (permission not granted yet). */
+  calendars(): Promise<{ list: CalInfo[]; limited: boolean }>;
   upcoming(days: number): Promise<CalEvent[]>;
   range(from: string, to: string): Promise<CalEvent[]>;
-  create(e: ProposedEvent): Promise<{ link: string }>;
+  create(e: NewEvent): Promise<{ link: string }>;
 }
 
 export const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris';
@@ -43,42 +76,80 @@ async function guard<T>(p: Promise<T>): Promise<T> {
   }
 }
 
+const PRIMARY: CalInfo = { id: 'primary', name: '', color: '#039be5', primary: true, writable: true };
+
 export function createCalendarPort(auth: OAuth2Client): CalendarPort {
   const api = calendarApi({ version: 'v3', auth });
+  let cache: { at: number; value: { list: CalInfo[]; limited: boolean } } | null = null;
   const port: CalendarPort = {
+    async calendars() {
+      if (cache && Date.now() - cache.at < 5 * 60_000) return cache.value;
+      let value: { list: CalInfo[]; limited: boolean };
+      try {
+        const res = await api.calendarList.list({ maxResults: 250, minAccessRole: 'reader' });
+        const list = (res.data.items ?? [])
+          .filter((c) => c.id && !c.hidden && !c.deleted)
+          .map((c) => ({
+            id: c.id as string,
+            name: c.summaryOverride || c.summary || (c.id as string),
+            color: c.backgroundColor || '#039be5',
+            primary: Boolean(c.primary),
+            writable: c.accessRole === 'owner' || c.accessRole === 'writer',
+          }))
+          .sort((x, y) => Number(y.primary) - Number(x.primary) || x.name.localeCompare(y.name));
+        value = { list: list.length ? list : [PRIMARY], limited: false };
+      } catch (e) {
+        // Not allowed to list calendars yet (the user has not reconnected since Calm asked for it): main one only.
+        const err = e as { status?: number; code?: number; message?: string };
+        if (err.status === 403 || err.code === 403 || /insufficient/i.test(err.message ?? '')) value = { list: [PRIMARY], limited: true };
+        else {
+          await guard(Promise.reject(e));
+          throw e;
+        }
+      }
+      cache = { at: Date.now(), value };
+      return value;
+    },
     async upcoming(days) {
       const now = new Date();
       return port.range(now.toISOString(), new Date(now.getTime() + days * 86400_000).toISOString());
     },
     async range(from, to) {
-      const res = await guard(
-        api.events.list({
-          calendarId: 'primary',
-          timeMin: from,
-          timeMax: to,
-          singleEvents: true,
-          orderBy: 'startTime',
-          maxResults: 250,
+      const { list } = await port.calendars();
+      const perCalendar = await Promise.all(
+        list.map(async (cal) => {
+          const res = await guard(
+            api.events.list({ calendarId: cal.id, timeMin: from, timeMax: to, singleEvents: true, orderBy: 'startTime', maxResults: 250 }),
+          );
+          return (res.data.items ?? [])
+            .filter((e) => e.status !== 'cancelled')
+            .map((e) => ({
+              title: e.summary || '(sans titre)',
+              start: e.start?.dateTime ?? e.start?.date ?? '',
+              end: e.end?.dateTime ?? e.end?.date ?? '',
+              allDay: !e.start?.dateTime,
+              id: e.id ?? undefined,
+              location: e.location ?? null,
+              // Google keeps notes as light HTML: shown as plain text.
+              description: e.description ? (/<[a-z]/i.test(e.description) ? htmlToText(e.description) : e.description).slice(0, 4000) : null,
+              link: e.htmlLink ?? null,
+              calendar: { id: cal.id, name: cal.name, color: cal.color, primary: cal.primary },
+            }));
         }),
       );
-      return (res.data.items ?? [])
-        .filter((e) => e.status !== 'cancelled')
-        .map((e) => ({
-          title: e.summary || '(sans titre)',
-          start: e.start?.dateTime ?? e.start?.date ?? '',
-          end: e.end?.dateTime ?? e.end?.date ?? '',
-          allDay: !e.start?.dateTime,
-        }));
+      return perCalendar.flat().sort((x, y) => x.start.localeCompare(y.start));
     },
     async create(e) {
       const res = await guard(
         api.events.insert({
-          calendarId: 'primary',
+          calendarId: e.calendarId ?? 'primary',
           requestBody: {
             summary: e.title,
             location: e.location ?? undefined,
-            start: { dateTime: e.start, timeZone: TIMEZONE },
-            end: { dateTime: e.end, timeZone: TIMEZONE },
+            description: e.description || undefined,
+            start: e.allDay ? { date: e.start } : { dateTime: e.start, timeZone: TIMEZONE },
+            end: e.allDay ? { date: e.end } : { dateTime: e.end, timeZone: TIMEZONE },
+            reminders: e.reminderMin === undefined ? undefined : { useDefault: false, overrides: [{ method: 'popup', minutes: e.reminderMin }] },
           },
         }),
       );

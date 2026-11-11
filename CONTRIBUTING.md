@@ -1,6 +1,6 @@
-# Contributing to Calme
+# Contributing to Calm
 
-Thanks for helping! Calme is developed in this repository: improvements land here, through pull requests,
+Thanks for helping! Calm is developed in this repository: improvements land here, through pull requests,
 so that everyone gets them in the official releases.
 
 ## How to contribute
@@ -18,7 +18,7 @@ so that everyone gets them in the official releases.
 
 ## Ground rules
 
-- **Safety first**: Calme never sends, deletes or unsubscribes without an explicit user action. Never weaken the
+- **Safety first**: Calm never sends, deletes or unsubscribes without an explicit user action. Never weaken the
   guards around Claude (`claude -p` with no tools, JSON schemas, mail content treated as untrusted data).
 - Every user-facing string goes through `web/src/i18n.ts`, in **English and French**.
 - Server code is TypeScript run natively by Node 24: relative imports with the `.ts` extension, no enums or namespaces.
@@ -27,5 +27,5 @@ so that everyone gets them in the official releases.
 
 ## Licensing of contributions
 
-Calme is released under the [MIT License](LICENSE). By submitting a contribution, you agree that it is licensed under
+Calm is released under the [MIT License](LICENSE). By submitting a contribution, you agree that it is licensed under
 the same terms.

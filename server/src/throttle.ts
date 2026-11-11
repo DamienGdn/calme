@@ -47,7 +47,7 @@ export function createThrottle(
     return next;
   };
 
-  /** Units spent in the last 60 s, the budget, and how many calls are queued (Calme is slowing down). */
+  /** Units spent in the last 60 s, the budget, and how many calls are queued (Calm is slowing down). */
   take.usage = () => {
     const t = now();
     const used = log.filter((e) => e.at > t - WINDOW_MS).reduce((n, e) => n + e.cost, 0);

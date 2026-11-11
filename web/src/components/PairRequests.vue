@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
 import { notifyError } from '../store.ts';
 
-/** On the computer running Calme: a screen (e.g. the iPhone home-screen app) asks for access; allow or refuse here. */
+/** On the computer running Calm: a screen (e.g. the iPhone home-screen app) asks for access; allow or refuse here. */
 const { t } = useI18n();
 const pending = ref<{ id: string; name: string }[]>([]);
 const load = () => api<typeof pending.value>('/api/pair/requests').then((v) => (pending.value = v)).catch(() => {});

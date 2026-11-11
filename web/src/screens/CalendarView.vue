@@ -12,6 +12,10 @@ interface CalEvent {
   start: string;
   end: string;
   allDay: boolean;
+  location?: string | null;
+  description?: string | null;
+  link?: string | null;
+  calendar?: { id: string; name: string; color: string; primary: boolean };
 }
 export interface PendingEvent {
   title: string;
@@ -25,7 +29,8 @@ type Item = CalEvent & { kind: 'agenda' | 'proposed' | 'conflict' };
  * Week (hour grid) and month (6×7 grid) views over Google Calendar plus events proposed by mails.
  * On the phone the week reads as a diary (one page per day) and the month as a dotted grid: tap a day to read it.
  */
-const props = defineProps<{ mode: 'semaine' | 'mois'; pending: PendingEvent[] }>();
+const props = defineProps<{ mode: 'semaine' | 'mois'; pending: PendingEvent[]; hidden?: string[] }>();
+const emit = defineEmits<{ open: [e: CalEvent & { fromMail?: string }] }>();
 const { t } = useI18n();
 
 const DAY_START = 7;
@@ -75,7 +80,7 @@ const weekdays = computed(() => days.value.slice(0, 7).map((d) => d.toLocaleDate
 
 const byDay = computed(() => {
   const items: Item[] = [
-    ...(events.value ?? []).map((e) => ({ ...e, kind: 'agenda' as const })),
+    ...(events.value ?? []).filter((e) => !e.calendar || !props.hidden?.includes(e.calendar.id)).map((e) => ({ ...e, kind: 'agenda' as const })),
     ...props.pending.map((p) => ({ title: p.title, start: p.start, end: p.end, allDay: false, kind: p.conflict ? ('conflict' as const) : ('proposed' as const) })),
   ];
   const map = new Map<string, Item[]>();
@@ -133,11 +138,13 @@ function place(e: Item) {
         @click="sel = key(d)"
       >
         <span class="month-n">{{ d.getDate() }}</span>
-        <span class="month-dots" aria-hidden="true"><i v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)" :key="i" :class="e.kind" /></span>
+        <span class="month-dots" aria-hidden="true"><i v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)" :key="i" :class="e.kind" :style="e.kind === 'agenda' && e.calendar ? { background: e.calendar.color } : undefined" /></span>
         <span
           v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)"
           :key="i"
           :class="['chip-ev', e.kind]"
+          :style="e.calendar ? { '--cal': e.calendar.color } : undefined"
+          @click.stop="emit('open', e)"
           :title="`${e.allDay ? t('agenda.allDay') : `${hm(e.start)}–${hm(e.end)}`} · ${e.title}`"
         >
           <span v-if="!e.allDay" class="mono">{{ hm(e.start) }}</span> {{ e.title }}
@@ -155,11 +162,20 @@ function place(e: Item) {
           <span class="eyebrow" style="padding: 0">{{ fromKey(k).toLocaleDateString(dateLocale(), { month: 'long' }) }}</span>
         </div>
         <div class="tl-evs">
-          <div v-for="(e, i) in dayItems(k)" :key="i" :class="['tl-ev', { prop: e.kind !== 'agenda', conflict: e.kind === 'conflict' }]">
+          <button
+            v-for="(e, i) in dayItems(k)"
+            :key="i"
+            type="button"
+            :class="['tl-ev', e.kind, { prop: e.kind !== 'agenda', conflict: e.kind === 'conflict' }]"
+            :style="e.calendar ? { '--cal': e.calendar.color } : undefined"
+            @click="emit('open', e)"
+          >
             <span class="mono muted tl-time"><span>{{ e.allDay ? t('agenda.allDay') : hm(e.start) }}</span><span v-if="!e.allDay" class="tl-t2">{{ hm(e.end) }}</span></span>
-            <span style="font-size: 15px">{{ e.title }}</span>
-            <span class="mono tag">{{ e.kind === 'agenda' ? t('agenda.tagAgenda') : t('agenda.tagProposed') }}</span>
-          </div>
+            <span class="tl-main">
+              <span class="tl-title">{{ e.title }}</span>
+              <span class="tl-cal">{{ e.kind === 'agenda' ? (e.calendar ? (e.calendar.primary ? t('agenda.mine') : e.calendar.name) : t('agenda.tagAgenda')) : t('agenda.tagProposed') }}</span>
+            </span>
+          </button>
           <p v-if="!dayItems(k).length" class="tl-free">{{ t('agenda.cal.free') }}</p>
         </div>
       </div>
@@ -173,13 +189,13 @@ function place(e: Item) {
         </span>
         <span class="mono muted week-allday-label">{{ t('agenda.cal.allDayRow') }}</span>
         <div v-for="d in days" :key="'a' + key(d)" class="week-allday">
-          <span v-for="(e, i) in allDay(d)" :key="i" :class="['chip-ev', e.kind]">{{ e.title }}</span>
+          <span v-for="(e, i) in allDay(d)" :key="i" :class="['chip-ev', e.kind]" :style="e.calendar ? { '--cal': e.calendar.color } : undefined" @click="emit('open', e)">{{ e.title }}</span>
         </div>
         <div class="week-hours">
           <span v-for="h in DAY_END - DAY_START" :key="h" class="mono" :style="{ height: `${HOUR_PX}px` }">{{ String(DAY_START + h - 1).padStart(2, '0') }}h</span>
         </div>
         <div v-for="d in days" :key="'c' + key(d)" :class="['week-col', { today: key(d) === today }]" :style="{ backgroundSize: `100% ${HOUR_PX}px` }">
-          <span v-for="(e, i) in timed(d)" :key="i" :class="['week-ev', e.kind]" :style="place(e)" :title="`${hm(e.start)}–${hm(e.end)} · ${e.title}`">
+          <span v-for="(e, i) in timed(d)" :key="i" :class="['week-ev', e.kind]" :style="{ ...place(e), ...(e.calendar ? { '--cal': e.calendar.color } : {}) }" @click="emit('open', e)" :title="`${hm(e.start)}–${hm(e.end)} · ${e.title}`">
             <span class="mono">{{ hm(e.start) }}</span>
             <span>{{ e.title }}</span>
           </span>

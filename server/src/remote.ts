@@ -66,7 +66,7 @@ function serve(bin: string, port: number): Promise<{ consentUrl: string | null }
   });
 }
 
-/** Exposes Calme to the user's own devices with `tailscale serve` (HTTPS, tailnet only). */
+/** Exposes Calm to the user's own devices with `tailscale serve` (HTTPS, tailnet only). */
 export function createRemote(port: number) {
   async function hostUrl(bin: string): Promise<string | null> {
     const st = JSON.parse(await run(bin, ['status', '--json']));

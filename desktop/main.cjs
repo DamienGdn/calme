@@ -1,10 +1,13 @@
-// Calme desktop: runs the Calme server in the background (inside the app), shows a menu bar icon
+// Calm desktop: runs the Calm server in the background (inside the app), shows a menu bar icon
 // with the number of mails awaiting a reply, and notifies every new mail.
 const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, powerSaveBlocker, shell } = require('electron');
 const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+
+// The app was called "Calme" before: its settings (pairing, notifications) stay in that folder.
+app.setPath('userData', path.join(app.getPath('appData'), 'Calme'));
 
 const POLL_MS = 30_000;
 const CALME_HOME = process.env.CALME_HOME || path.join(os.homedir(), '.calme');
@@ -40,7 +43,7 @@ let server = null;
 let serverRestarts = 0;
 let awakeId = null;
 
-/** Keeps the computer from sleeping while Calme runs (the display may still turn off). */
+/** Keeps the computer from sleeping while Calm runs (the display may still turn off). */
 function applyKeepAwake() {
   if (settings.keepAwake && awakeId === null) awakeId = powerSaveBlocker.start('prevent-app-suspension');
   if (!settings.keepAwake && awakeId !== null) {
@@ -129,7 +132,7 @@ function createWindow() {
     height: 900,
     minWidth: 380,
     minHeight: 560,
-    title: 'Calme',
+    title: 'Calm',
     show: false,
     backgroundColor: '#0D0E11',
     icon: path.join(__dirname, 'build/icon.png'),
@@ -179,7 +182,7 @@ function createWindow() {
 
 function errorPage(message) {
   const html = `<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;display:grid;place-items:center;background:#0D0E11;color:#EDEBE5;font:15px system-ui">
-  <div style="max-width:440px;padding:24px"><h1 style="font:italic 400 44px Georgia,serif;margin:0 0 16px">Calme démarre…</h1>
+  <div style="max-width:440px;padding:24px"><h1 style="font:italic 400 44px Georgia,serif;margin:0 0 16px">Calm démarre…</h1>
   <p style="color:#9C9BA3;line-height:1.6">${message} Nouvelle tentative dans quelques secondes. Journal : ~/.calme/server.log</p></div></body>`;
   return 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
 }
@@ -204,21 +207,21 @@ const TEXT = {
   fr: {
     cat: { reply: 'À répondre', read: 'À lire', news: 'Newsletter', trash: 'À supprimer' },
     toAnswer: (n) => `${n} à répondre`, none: 'Rien à répondre', many: (n) => `${n} nouveaux mails`,
-    open: 'Ouvrir Calme', compose: 'Nouveau message', sync: 'Relever maintenant', notifications: 'Notifications',
+    open: 'Ouvrir Calm', compose: 'Nouveau message', sync: 'Relever maintenant', notifications: 'Notifications',
     notifyAll: 'Chaque nouveau mail', notifyReply: 'Seulement « À répondre »', notifyOff: 'Désactivées',
-    pairAsk: (n) => `${n} demande l’accès à Calme`, pairBody: 'Ouvre Calme pour autoriser ou refuser.', login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calme',
+    pairAsk: (n) => `${n} demande l’accès à Calm`, pairBody: 'Ouvre Calm pour autoriser ou refuser.', login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calm',
   },
   en: {
     cat: { reply: 'To answer', read: 'To read', news: 'Newsletter', trash: 'To delete' },
     toAnswer: (n) => `${n} to answer`, none: 'Nothing to answer', many: (n) => `${n} new mails`,
-    open: 'Open Calme', compose: 'New message', sync: 'Fetch mail now', notifications: 'Notifications',
+    open: 'Open Calm', compose: 'New message', sync: 'Fetch mail now', notifications: 'Notifications',
     notifyAll: 'Every new mail', notifyReply: 'Only “To answer”', notifyOff: 'Off',
-    pairAsk: (n) => `${n} is asking for access to Calme`, pairBody: 'Open Calme to allow or refuse.', login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calme',
+    pairAsk: (n) => `${n} is asking for access to Calm`, pairBody: 'Open Calm to allow or refuse.', login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calm',
   },
 };
 const tx = () => TEXT[lang] ?? TEXT.en;
 
-/** Notifies each new mail (skipping those Calme files under "À supprimer"); more than 3 at once are grouped. */
+/** Notifies each new mail (skipping those Calm files under "À supprimer"); more than 3 at once are grouped. */
 async function poll() {
   try {
     const state = await apiFetch('/api/state');
@@ -226,7 +229,7 @@ async function poll() {
     if (state.language && TEXT[state.language]) lang = state.language;
     const emails = state.emails || [];
     counts = { reply: state.counts?.reply ?? 0, total: emails.length };
-    // Wait for Calme's triage so the notification can say what the mail is about.
+    // Wait for Calm's triage so the notification can say what the mail is about.
     const ready = emails.filter((m) => m.analysis);
     if (seen && Notification.isSupported() && settings.notify !== 'off') {
       const fresh = ready.filter((m) => !seen.has(m.id) && m.analysis.category !== 'trash' && (settings.notify === 'all' || m.analysis.category === 'reply'));
@@ -269,7 +272,7 @@ async function pollPairs() {
 function refreshTray() {
   if (!tray) return;
   const label = counts.reply ? tx().toAnswer(counts.reply) : tx().none;
-  tray.setToolTip(`Calme · ${label}`);
+  tray.setToolTip(`Calm · ${label}`);
   if (process.platform === 'darwin') tray.setTitle(counts.reply ? ` ${counts.reply}` : '');
   app.setBadgeCount?.(counts.reply);
   const login = app.getLoginItemSettings().openAtLogin;
@@ -318,13 +321,14 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => show());
   app.whenReady().then(async () => {
-    app.setName('Calme');
+    app.setName('Calm');
     app.setAppUserModelId('app.calme.desktop');
     settings = loadSettings();
-    // Runs permanently: start with the Mac (hidden, in the menu bar). Done once; the menu checkbox can undo it.
-    if (!settings.loginItemConfigured && app.isPackaged) {
+    // Runs permanently: start with the Mac (hidden, in the menu bar). Done once per app name (the app was "Calme"
+    // before, a different bundle for macOS); the menu checkbox can undo it.
+    if (settings.loginItemConfigured !== 'Calm' && app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: true, openAsHidden: true });
-      settings.loginItemConfigured = true;
+      settings.loginItemConfigured = 'Calm';
       saveSettings();
     }
     const icon = nativeImage.createFromPath(path.join(__dirname, 'build', process.platform === 'darwin' ? 'trayTemplate.png' : 'tray.png'));

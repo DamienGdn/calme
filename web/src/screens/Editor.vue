@@ -130,7 +130,7 @@ function onDrop(e: DragEvent) {
     <aside v-if="mail" class="context" :aria-label="t('editor.inReplyTo')">
       <div style="display: flex; flex-direction: column; gap: 8px">
         <span class="eyebrow">{{ t('editor.inReplyTo') }}</span>
-        <span class="serif" style="font-size: 34px; line-height: 1.02; overflow-wrap: anywhere">{{ mail.subject || t('common.noSubject') }}</span>
+        <span class="serif" style="font-size: 27px; line-height: 1.02; overflow-wrap: anywhere">{{ mail.subject || t('common.noSubject') }}</span>
         <span class="muted" style="font-size: 13px">{{ mail.fromName }} · {{ when(mail.date) }}</span>
       </div>
       <blockquote>{{ original ?? mail.snippet }}</blockquote>
@@ -220,7 +220,7 @@ function onDrop(e: DragEvent) {
           {{ busy === 'send' ? t('common.sending') : t('common.send') }} <Icon name="arrow" :size="16" />
         </button>
         <span style="flex: 1" />
-        <span class="serif muted" style="font-style: italic; font-size: 17px">{{ t('editor.nothingLeaves') }}</span>
+        <span class="serif muted" style="font-style: italic; font-size: 15px">{{ t('editor.nothingLeaves') }}</span>
       </footer>
     </form>
   </div>

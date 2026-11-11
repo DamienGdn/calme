@@ -81,7 +81,7 @@ function eventDate(start: string, end: string) {
     <section v-if="a?.event" class="event-card" :aria-label="t('reader.eventFound')">
       <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 4px">
         <span class="eyebrow">{{ t('reader.eventFound') }}</span>
-        <span class="serif" style="font-size: 22px; line-height: 1.15">{{ a.event.title }}</span>
+        <span class="serif" style="font-size: 19px; line-height: 1.15">{{ a.event.title }}</span>
         <span class="muted" style="font-size: 13px">{{ eventDate(a.event.start, a.event.end) }}{{ a.event.location ? ` · ${a.event.location}` : '' }}</span>
       </div>
       <a v-if="eventLink" class="btn" :href="eventLink" target="_blank" rel="noopener noreferrer">{{ t('reader.seeInCalendar') }}</a>

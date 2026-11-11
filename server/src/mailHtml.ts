@@ -1,5 +1,5 @@
 /**
- * Cleans a mail's HTML before Calme shows it. Mail is untrusted: this is the first guard; the second is the client,
+ * Cleans a mail's HTML before Calm shows it. Mail is untrusted: this is the first guard; the second is the client,
  * which renders it in a sandboxed frame with no scripts and a strict Content-Security-Policy.
  */
 

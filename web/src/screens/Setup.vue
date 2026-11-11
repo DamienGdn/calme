@@ -103,7 +103,7 @@ async function finish() {
     <header class="setup-head">
       <div class="brand">
         <span class="logo" aria-hidden="true">c.</span>
-        <span class="serif" style="font-size: 26px; font-style: italic">Calme</span>
+        <span class="wordmark">Calm<span class="wordmark-dot">.</span></span>
       </div>
       <select class="select" :value="locale" :aria-label="t('common.language')" @change="savePref({ language: ($event.target as HTMLSelectElement).value as Lang })">
         <option value="fr">Français</option>
@@ -122,7 +122,7 @@ async function finish() {
     <section v-else class="setup-card rise" :key="step">
       <!-- 1 · Claude Code -->
       <template v-if="step === 0">
-        <h1 class="headline" style="font-size: 52px">{{ t('setup.claude.title') }} <em>{{ t('setup.claude.em') }}</em></h1>
+        <h1 class="headline" style="font-size: 40px">{{ t('setup.claude.title') }} <em>{{ t('setup.claude.em') }}</em></h1>
         <p class="lead">{{ t('setup.claude.intro') }}</p>
         <div :class="['check', s.claude.installed ? 'ok' : 'ko']">
           <span class="dot" aria-hidden="true" />
@@ -146,7 +146,7 @@ claude   # {{ t('setup.claude.login') }}</pre>
 
       <!-- 2 · Gmail + Calendar -->
       <template v-else-if="step === 1">
-        <h1 class="headline" style="font-size: 52px">{{ t('setup.google.title') }} <em>{{ t('setup.google.em') }}</em></h1>
+        <h1 class="headline" style="font-size: 40px">{{ t('setup.google.title') }} <em>{{ t('setup.google.em') }}</em></h1>
         <p class="lead">{{ t('setup.google.intro') }}</p>
         <div :class="['check', s.credentials ? 'ok' : 'ko']"><span class="dot" aria-hidden="true" /> {{ s.credentials ? t('setup.google.hasFile') : t('setup.google.noFile') }}</div>
         <div :class="['check', s.gmail ? 'ok' : 'ko']"><span class="dot" aria-hidden="true" /> {{ s.gmail ? t('setup.google.connected', { account: s.account ?? '' }) : t('setup.google.notConnected') }}</div>
@@ -189,7 +189,7 @@ claude   # {{ t('setup.claude.login') }}</pre>
 
       <!-- 3 · Preferences -->
       <template v-else-if="step === 2">
-        <h1 class="headline" style="font-size: 52px">{{ t('setup.prefs.title') }} <em>{{ t('setup.prefs.em') }}</em></h1>
+        <h1 class="headline" style="font-size: 40px">{{ t('setup.prefs.title') }} <em>{{ t('setup.prefs.em') }}</em></h1>
         <div class="form-grid" style="max-width: 760px">
           <label>
             <span class="eyebrow">{{ t('admin.language') }}</span>
@@ -223,7 +223,7 @@ claude   # {{ t('setup.claude.login') }}</pre>
 
       <!-- 4 · Done -->
       <template v-else>
-        <h1 class="headline" style="font-size: 52px">{{ t('setup.done.title') }} <em>{{ t('setup.done.em') }}</em></h1>
+        <h1 class="headline" style="font-size: 40px">{{ t('setup.done.title') }} <em>{{ t('setup.done.em') }}</em></h1>
         <ul class="summary">
           <li><span class="dot" aria-hidden="true" /> {{ t('setup.claude.found', { v: s.claude.version }) }}</li>
           <li><span class="dot" aria-hidden="true" /> {{ t('setup.google.connected', { account: s.account ?? '' }) }}</li>

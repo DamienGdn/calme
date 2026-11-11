@@ -2,7 +2,7 @@ import type { ClaudeRunner } from './claude.ts';
 import type { Language } from './settings.ts';
 
 /**
- * Calme's prompts are written in French; when the app is in English, every answer
+ * Calm's prompts are written in French; when the app is in English, every answer
  * (summaries, actions, suggested replies, drafts, search answers) must come back in English.
  */
 export function withLanguage(r: ClaudeRunner, lang: () => Language): ClaudeRunner {

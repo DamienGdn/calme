@@ -1,21 +1,39 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { post } from '../api.ts';
+import { api, post } from '../api.ts';
+import Icon from '../components/Icon.vue';
 import { notify, notifyError } from '../store.ts';
 
-const emit = defineEmits<{ done: [] }>();
+/**
+ * Appointment sheet: title, all day or times (the end follows the start), place with French address suggestions
+ * (Base Adresse Nationale), reminder and notes. Bottom sheet on the phone, dialog on the computer.
+ */
+const props = defineProps<{ day?: string; calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
+const emit = defineEmits<{ done: []; close: [] }>();
 const { t } = useI18n();
+
 const localDay = (d: Date) => d.toLocaleDateString('sv-SE');
-const tomorrow = new Date();
-tomorrow.setDate(tomorrow.getDate() + 1);
+const addDays = (day: string, n: number) => {
+  const d = new Date(`${day}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return localDay(d);
+};
+const tomorrow = addDays(localDay(new Date()), 1);
 
 const title = ref('');
-const date = ref(localDay(tomorrow));
+const allDay = ref(false);
+const startDay = ref(props.day ?? tomorrow);
+const endDay = ref(props.day ?? tomorrow);
 const from = ref('10:00');
 const to = ref('11:00');
 const place = ref('');
+const coords = ref<{ lat: number; lon: number } | null>(null);
+const reminder = ref<number | null>(30);
+const notes = ref('');
+const calendarId = ref(props.calendars?.find((c) => c.primary)?.id ?? props.calendars?.[0]?.id ?? '');
 const busy = ref(false);
+const REMINDERS: (number | null)[] = [null, 10, 30, 60, 1440];
 
 /** Local date + time → RFC 3339 with the browser's UTC offset. */
 function toIso(day: string, hm: string): string {
@@ -23,12 +41,40 @@ function toIso(day: string, hm: string): string {
   const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, '0');
   return `${day}T${hm}:00${off >= 0 ? '+' : '-'}${pad(off / 60)}:${pad(off % 60)}`;
 }
+const minutes = (hm: string) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+// Moving the start moves the end with it, keeping the length of the appointment.
+watch(startDay, (d, old) => {
+  const span = Math.round((Date.parse(`${endDay.value}T12:00:00`) - Date.parse(`${old}T12:00:00`)) / 86_400_000);
+  endDay.value = addDays(d, Math.max(0, span));
+});
+watch(from, (f, old) => {
+  if (startDay.value !== endDay.value) return;
+  const length = Math.max(15, minutes(to.value) - minutes(old));
+  to.value = hm(Math.min(minutes(f) + length, 23 * 60 + 59));
+});
+
+const valid = computed(() => {
+  if (!title.value.trim() || endDay.value < startDay.value) return false;
+  return allDay.value || Date.parse(toIso(endDay.value, to.value)) > Date.parse(toIso(startDay.value, from.value));
+});
 
 async function submit() {
+  if (!valid.value) return;
   busy.value = true;
   try {
-    await post('/api/agenda/events', { title: title.value, start: toIso(date.value, from.value), end: toIso(date.value, to.value), location: place.value || null });
-    notify(t('agenda.addedToast', { title: title.value }));
+    await post('/api/agenda/events', {
+      title: title.value.trim(),
+      allDay: allDay.value,
+      start: allDay.value ? startDay.value : toIso(startDay.value, from.value),
+      end: allDay.value ? addDays(endDay.value, 1) : toIso(endDay.value, to.value),
+      location: place.value.trim() || null,
+      description: notes.value.trim() || undefined,
+      reminderMin: reminder.value ?? undefined,
+      calendarId: (props.calendars?.length ?? 0) > 1 && calendarId.value ? calendarId.value : undefined,
+    });
+    notify(t('agenda.addedToast', { title: title.value.trim() }));
     emit('done');
   } catch (e) {
     notifyError(e);
@@ -36,18 +82,145 @@ async function submit() {
     busy.value = false;
   }
 }
+
+// --- Place: suggestions from the French address base as you type.
+interface Address { label: string; context: string; lat: number; lon: number }
+const suggestions = ref<Address[]>([]);
+const active = ref(-1);
+const addrError = ref('');
+let timer = 0;
+let lastQuery = '';
+function onPlaceInput() {
+  coords.value = null;
+  window.clearTimeout(timer);
+  const q = place.value.trim();
+  if (q.length < 3) {
+    suggestions.value = [];
+    return;
+  }
+  timer = window.setTimeout(async () => {
+    lastQuery = q;
+    try {
+      const r = await api<Address[]>(`/api/address?q=${encodeURIComponent(q)}`);
+      if (lastQuery !== q) return;
+      suggestions.value = r;
+      active.value = -1;
+      addrError.value = '';
+    } catch {
+      suggestions.value = [];
+      addrError.value = t('agenda.form.addrDown');
+    }
+  }, 250);
+}
+function pick(a: Address) {
+  place.value = a.label;
+  coords.value = Number.isFinite(a.lat) ? { lat: a.lat, lon: a.lon } : null;
+  suggestions.value = [];
+}
+function onPlaceKey(e: KeyboardEvent) {
+  if (!suggestions.value.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const n = suggestions.value.length;
+    active.value = (active.value + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+  } else if (e.key === 'Enter' && active.value >= 0) {
+    e.preventDefault();
+    pick(suggestions.value[active.value]);
+  } else if (e.key === 'Escape') {
+    e.stopPropagation();
+    suggestions.value = [];
+  }
+}
+const mapUrl = computed(() => (coords.value ? `https://www.openstreetmap.org/?mlat=${coords.value.lat}&mlon=${coords.value.lon}#map=17/${coords.value.lat}/${coords.value.lon}` : ''));
+
+const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
+onMounted(() => window.addEventListener('keydown', onKey));
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey);
+  window.clearTimeout(timer);
+});
 </script>
 
 <template>
-  <form class="card rise" :aria-label="t('agenda.newEvent')" @submit.prevent="submit">
-    <h2>{{ t('agenda.newEvent') }}</h2>
-    <div class="form-grid">
-      <label><span class="eyebrow">{{ t('agenda.form.title') }}</span><input v-model="title" class="field-input" required :placeholder="t('agenda.form.titlePh')" /></label>
-      <label><span class="eyebrow">{{ t('agenda.form.date') }}</span><input v-model="date" class="field-input" type="date" required /></label>
-      <label><span class="eyebrow">{{ t('agenda.form.start') }}</span><input v-model="from" class="field-input" type="time" required /></label>
-      <label><span class="eyebrow">{{ t('agenda.form.end') }}</span><input v-model="to" class="field-input" type="time" required /></label>
-      <label style="grid-column: 1 / -1"><span class="eyebrow">{{ t('agenda.form.place') }}</span><input v-model="place" class="field-input" /></label>
-    </div>
-    <button class="btn btn-prim" style="align-self: flex-start" :disabled="busy || !title.trim()">{{ busy ? t('agenda.form.adding') : t('agenda.form.submit') }}</button>
-  </form>
+  <div class="sheet-backdrop" @click.self="emit('close')">
+    <form class="sheet rise" role="dialog" aria-modal="true" :aria-label="t('agenda.newEvent')" @submit.prevent="submit">
+      <div class="sheet-grip" aria-hidden="true" />
+      <header class="sheet-head">
+        <button type="button" class="linkish" @click="emit('close')">{{ t('common.cancel') }}</button>
+        <span class="eyebrow">{{ t('agenda.newEvent') }}</span>
+        <button class="btn btn-prim" :disabled="busy || !valid">{{ busy ? t('agenda.form.adding') : t('agenda.form.add') }}</button>
+      </header>
+
+      <label class="sr" for="ev-title">{{ t('agenda.form.title') }}</label>
+      <input id="ev-title" v-model="title" class="ev-title" required autocomplete="off" :placeholder="t('agenda.form.titlePh')" />
+
+      <section class="ev-group" :aria-label="t('agenda.form.when')">
+        <label class="ev-line switch">
+          <span class="ev-label"><Icon name="calendar" :size="16" /> {{ t('agenda.allDay') }}</span>
+          <input id="ev-allday" v-model="allDay" type="checkbox" />
+        </label>
+        <div class="ev-line">
+          <span class="ev-label">{{ t('agenda.form.start') }}</span>
+          <span class="ev-pair">
+            <input id="ev-start-day" v-model="startDay" type="date" class="field-input" required :aria-label="t('agenda.form.startDay')" />
+            <input v-if="!allDay" id="ev-start-time" v-model="from" type="time" class="field-input" required :aria-label="t('agenda.form.startTime')" />
+          </span>
+        </div>
+        <div class="ev-line">
+          <span class="ev-label">{{ t('agenda.form.end') }}</span>
+          <span class="ev-pair">
+            <input id="ev-end-day" v-model="endDay" type="date" class="field-input" :min="startDay" required :aria-label="t('agenda.form.endDay')" />
+            <input v-if="!allDay" id="ev-end-time" v-model="to" type="time" class="field-input" required :aria-label="t('agenda.form.endTime')" />
+          </span>
+        </div>
+        <p v-if="!valid && title.trim()" class="ev-warn">{{ t('agenda.form.endBefore') }}</p>
+      </section>
+
+      <section class="ev-group">
+        <div class="ev-place">
+          <label class="ev-label" for="ev-place">{{ t('agenda.form.placeLabel') }}</label>
+          <input
+            id="ev-place"
+            v-model="place"
+            class="field-input"
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            :aria-expanded="suggestions.length > 0"
+            aria-controls="ev-addr"
+            :placeholder="t('agenda.form.placePh')"
+            @input="onPlaceInput"
+            @keydown="onPlaceKey"
+          />
+          <ul v-if="suggestions.length" id="ev-addr" class="addr-list" role="listbox">
+            <li v-for="(a, i) in suggestions" :key="a.label + i" role="option" :aria-selected="i === active">
+              <button type="button" @click="pick(a)"><strong>{{ a.label }}</strong><span>{{ a.context }}</span></button>
+            </li>
+          </ul>
+          <p v-if="addrError" class="ev-warn">{{ addrError }}</p>
+          <a v-if="mapUrl" class="ev-map" :href="mapUrl" target="_blank" rel="noopener noreferrer"><Icon name="arrow" :size="14" /> {{ t('agenda.form.seeMap') }}</a>
+          <span class="muted" style="font-size: 11px">{{ t('agenda.form.addrSource') }}</span>
+        </div>
+      </section>
+
+      <section class="ev-group">
+        <label v-if="(calendars?.length ?? 0) > 1" class="ev-line">
+          <span class="ev-label"><i class="cal-dot" :style="{ background: calendars?.find((c) => c.id === calendarId)?.color }" aria-hidden="true" /> {{ t('agenda.form.calendar') }}</span>
+          <select id="ev-calendar" v-model="calendarId" class="select">
+            <option v-for="c in calendars" :key="c.id" :value="c.id">{{ c.primary ? t('agenda.mine') : c.name }}</option>
+          </select>
+        </label>
+        <label class="ev-line">
+          <span class="ev-label"><Icon name="bell" :size="16" /> {{ t('agenda.form.reminder') }}</span>
+          <select id="ev-reminder" v-model="reminder" class="select">
+            <option v-for="r in REMINDERS" :key="String(r)" :value="r">{{ t(`agenda.form.reminders.${r ?? 'none'}`) }}</option>
+          </select>
+        </label>
+        <label class="ev-notes">
+          <span class="ev-label">{{ t('agenda.form.notes') }}</span>
+          <textarea id="ev-notes" v-model="notes" rows="3" class="plain" :placeholder="t('agenda.form.notesPh')" />
+        </label>
+      </section>
+    </form>
+  </div>
 </template>

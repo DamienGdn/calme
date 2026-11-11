@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, trash, unsubscribe, untrash } from './actions.ts';
-import { conflictWith, formatAgenda, ISO_DATETIME, localIso, type CalendarPort } from './calendar.ts';
+import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, type CalendarPort } from './calendar.ts';
 import type { ClaudeRunner } from './claude.ts';
 import type { Config } from './config.ts';
 import { GmailDisconnected, type GmailPort } from './gmail.ts';
@@ -51,9 +51,9 @@ export interface Deps {
 }
 
 const MANIFEST = {
-  name: 'Calme',
-  short_name: 'Calme',
-  description: 'Your Gmail, sorted by Calme.',
+  name: 'Calm',
+  short_name: 'Calm',
+  description: 'Your Gmail, sorted by Calm.',
   start_url: '/',
   scope: '/',
   display: 'standalone',
@@ -139,7 +139,7 @@ export function createApp(d: Deps) {
   });
 
   app.get('/auth/google', (c) => {
-    if (!isLocalRequest(c)) return c.text('Connexion Gmail possible uniquement depuis le PC qui fait tourner Calme.', 403);
+    if (!isLocalRequest(c)) return c.text('Connexion Gmail possible uniquement depuis le PC qui fait tourner Calm.', 403);
     const state = randomBytes(16).toString('hex');
     oauthStates.add(state);
     const url = new URL(d.oauth.authUrl(redirect()));
@@ -155,19 +155,19 @@ export function createApp(d: Deps) {
     me = null;
     d.runCycle().catch(() => {});
     const en = getSettings(store, defaults()).language === 'en';
-    return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Calme</title>
+    return c.html(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Calm</title>
 <body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0D0E11;color:#EDEBE5;font:16px system-ui">
 <div style="max-width:460px;padding:24px;text-align:center">
 <div style="width:72px;height:72px;margin:0 auto 20px;border-radius:18px;background:#C8F03C;color:#0D0E11;display:grid;place-items:center;font:italic 44px Georgia,serif">c.</div>
 <h1 style="font:italic 400 40px Georgia,serif;margin:0 0 12px">${en ? 'Gmail is connected.' : 'Gmail est connecté.'}</h1>
-<p style="color:#9C9BA3;line-height:1.6">${en ? 'You can close this tab and go back to Calme: it continues on its own.' : 'Tu peux fermer cet onglet et revenir dans Calme : il continue tout seul.'}</p>
-<p><a href="/" style="color:#C8F03C">${en ? 'Open Calme here' : 'Ouvrir Calme ici'}</a></p></div>
+<p style="color:#9C9BA3;line-height:1.6">${en ? 'You can close this tab and go back to Calm: it continues on its own.' : 'Tu peux fermer cet onglet et revenir dans Calm : il continue tout seul.'}</p>
+<p><a href="/" style="color:#C8F03C">${en ? 'Open Calm here' : 'Ouvrir Calm ici'}</a></p></div>
 <script>setTimeout(function(){window.close()},2500)</script></body>`);
   });
 
   // --- Pairing token on every API route ---
   // Pairing a screen from afar: the iPhone home-screen app has its own storage, so the QR code (which pairs Safari)
-  // cannot reach it. The screen asks; the user approves on the computer running Calme; the screen picks up the token
+  // cannot reach it. The screen asks; the user approves on the computer running Calm; the screen picks up the token
   // once. Requests live 5 minutes, at most 3 wait at a time, and their 128-bit id is the screen's only handle.
   type PairRequest = { id: string; name: string; at: number; status: 'pending' | 'approved' | 'denied' };
   const pairRequests = new Map<string, PairRequest>();
@@ -200,7 +200,7 @@ export function createApp(d: Deps) {
 
   app.get('/api/pair/requests', (c) => c.json(livePairs().filter((r) => r.status === 'pending').map(({ id, name, at }) => ({ id, name, at }))));
   app.post('/api/pair/requests/:id', async (c) => {
-    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calm' }, 403);
     const { approve } = await c.req.json<{ approve?: unknown }>();
     livePairs();
     const r = pairRequests.get(c.req.param('id'));
@@ -243,7 +243,7 @@ export function createApp(d: Deps) {
 
   // The Google client secret is only accepted from this computer (like the Google sign-in itself).
   app.post('/api/setup/credentials', async (c) => {
-    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calm' }, 403);
     const raw = await c.req.json().catch(() => null);
     if (!validateCredentials(raw)) return c.json({ error: 'This is not a Google OAuth client file (type “Desktop app”).' }, 400);
     d.oauth.saveCredentials?.(raw);
@@ -267,7 +267,7 @@ export function createApp(d: Deps) {
 
   app.post('/api/compose', async (c) => {
     const b = await c.req.json<{ to?: string; brief?: string; tone?: Tone }>();
-    if (!b.brief?.trim()) return c.json({ error: 'Dis à Calme ce que tu veux écrire' }, 400);
+    if (!b.brief?.trim()) return c.json({ error: 'Dis à Calm ce que tu veux écrire' }, 400);
     const firstTo = (b.to ?? '').split(',')[0]?.replace(/.*</, '').replace(/>.*/, '').trim().toLowerCase();
     const history = firstTo ? (d.archive?.withContact(firstTo, 5) ?? []) : [];
     return c.json(await composeMail(d.runner, { to: b.to ?? '', brief: b.brief.slice(0, 2000), tone: b.tone ?? 'neutral', history }));
@@ -321,7 +321,7 @@ export function createApp(d: Deps) {
     return c.json(rest);
   });
 
-  // The mail's formatted version, cleaned (mailHtml.ts). Mails stored before Calme kept HTML get it from Gmail once.
+  // The mail's formatted version, cleaned (mailHtml.ts). Mails stored before Calm kept HTML get it from Gmail once.
   app.get('/api/mail/:id/html', async (c) => {
     const id = c.req.param('id');
     const m = store.getMail(id);
@@ -357,7 +357,7 @@ export function createApp(d: Deps) {
     return c.json({ ok: true });
   });
 
-  // "Handled": a mail leaves "to answer" without a reply from Calme (and comes back with Undo).
+  // "Handled": a mail leaves "to answer" without a reply from Calm (and comes back with Undo).
   app.post('/api/mail/:id/category', async (c) => {
     const { category } = await c.req.json<{ category?: unknown }>();
     if (!CATEGORIES.includes(category as Category)) return c.json({ error: 'Unknown category' }, 400);
@@ -437,7 +437,8 @@ export function createApp(d: Deps) {
         };
       })
       .sort((a, b) => a.event.start.localeCompare(b.event.start));
-    return c.json({ connected: Boolean(cal), events, proposals });
+    const cals = cal ? await cal.calendars() : { list: [], limited: false };
+    return c.json({ connected: Boolean(cal), events, proposals, calendars: cals.list, limitedCalendars: cals.limited });
   });
 
   app.get('/api/agenda/range', async (c) => {
@@ -464,16 +465,60 @@ export function createApp(d: Deps) {
     return c.json({ ok: true });
   });
 
+  // Appointment form: timed or all-day (end day excluded), place, notes, reminder.
   app.post('/api/agenda/events', async (c) => {
-    const b = await c.req.json<{ title?: string; start?: string; end?: string; location?: string | null }>();
+    const b = await c.req.json<{ title?: string; start?: string; end?: string; allDay?: boolean; location?: string | null; description?: string; reminderMin?: number; calendarId?: string }>();
     const title = String(b.title ?? '').trim().slice(0, 200);
     const start = String(b.start ?? '');
     const end = String(b.end ?? '');
-    if (!title || !ISO_DATETIME.test(start) || !ISO_DATETIME.test(end) || Date.parse(end) <= Date.parse(start))
-      return c.json({ error: 'Titre, début et fin valides requis (la fin après le début)' }, 400);
+    const allDay = b.allDay === true;
+    const DAY = /^\d{4}-\d{2}-\d{2}$/;
+    const valid = allDay ? DAY.test(start) && DAY.test(end) && end > start : ISO_DATETIME.test(start) && ISO_DATETIME.test(end) && Date.parse(end) > Date.parse(start);
+    if (!title || !valid) return c.json({ error: 'Titre, début et fin valides requis (la fin après le début)' }, 400);
+    if (b.reminderMin !== undefined && !REMINDERS.includes(b.reminderMin)) return c.json({ error: 'Rappel inconnu' }, 400);
     const cal = d.calendar?.();
     if (!cal) throw new GmailDisconnected();
-    return c.json(await cal.create({ title, start, end, location: String(b.location ?? '').trim() || null }));
+    if (b.calendarId !== undefined && !(await cal.calendars()).list.some((x) => x.id === b.calendarId && x.writable))
+      return c.json({ error: 'Agenda inconnu ou en lecture seule' }, 400);
+    const description = String(b.description ?? '').trim().slice(0, 4000);
+    return c.json(
+      await cal.create({
+        title,
+        start,
+        end,
+        location: String(b.location ?? '').trim().slice(0, 300) || null,
+        allDay,
+        ...(description ? { description } : {}),
+        ...(b.reminderMin !== undefined ? { reminderMin: b.reminderMin } : {}),
+        ...(b.calendarId !== undefined ? { calendarId: b.calendarId } : {}),
+      }),
+    );
+  });
+
+  // French address suggestions (Base Adresse Nationale, served by IGN's Géoplateforme). Only the typed text is sent.
+  app.get('/api/address', async (c) => {
+    const q = (c.req.query('q') ?? '').trim().slice(0, 200);
+    if (q.length < 3) return c.json([]);
+    const url = `https://data.geopf.fr/geocodage/search?${new URLSearchParams({ q, limit: '6', autocomplete: '1', index: 'address' })}`;
+    try {
+      const res = await (d.fetchImpl ?? fetch)(url, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      type Feature = { geometry?: { coordinates?: [number, number] }; properties?: Record<string, unknown> };
+      const j = (await res.json()) as { features?: Feature[] };
+      return c.json(
+        (j.features ?? []).slice(0, 6).map((f) => ({
+          label: String(f.properties?.label ?? ''),
+          name: String(f.properties?.name ?? ''),
+          postcode: String(f.properties?.postcode ?? ''),
+          city: String(f.properties?.city ?? ''),
+          context: String(f.properties?.context ?? ''),
+          lat: Number(f.geometry?.coordinates?.[1]),
+          lon: Number(f.geometry?.coordinates?.[0]),
+        })),
+      );
+    } catch {
+      return c.json({ error: 'Recherche d’adresse indisponible : saisis l’adresse à la main.' }, 502);
+    }
   });
 
   app.post('/api/mail/:id/slots', async (c) => {
@@ -614,7 +659,7 @@ export function createApp(d: Deps) {
 
   // Overwrites the whole database at the next start: only from the computer itself.
   app.post('/api/backup/restore', async (c) => {
-    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calm' }, 403);
     if (!d.backup) return c.json({ error: 'Backups unavailable' }, 400);
     const { name } = await c.req.json<{ name?: string }>();
     try {
@@ -630,7 +675,7 @@ export function createApp(d: Deps) {
   app.get('/api/remote', async (c) => c.json(d.remote ? await d.remote.status() : { installed: false, serving: false, url: null }));
 
   app.post('/api/remote/enable', async (c) => {
-    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calme' }, 403);
+    if (!isLocalRequest(c)) return c.json({ error: 'Only from the computer running Calm' }, 403);
     if (!d.remote) return c.json({ error: 'Unavailable' }, 400);
     return c.json(await d.remote.enable());
   });

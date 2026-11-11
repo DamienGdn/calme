@@ -203,7 +203,7 @@ draft : la réponse complète en français proposant ces créneaux en toutes let
   return { slots: (res?.slots ?? []).map((s) => ({ start: str(s?.start), end: str(s?.end) })), draft: str(res?.draft) };
 }
 
-/** Calme writes a brand-new mail from the user's brief, using recent exchanges with the recipient for tone and context. */
+/** Calm writes a brand-new mail from the user's brief, using recent exchanges with the recipient for tone and context. */
 export async function composeMail(
   r: ClaudeRunner,
   i: { to: string; brief: string; tone: Tone; history: { date: number; fromEmail: string; subject: string; snippet: string }[] },
