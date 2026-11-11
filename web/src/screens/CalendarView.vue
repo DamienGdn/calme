@@ -7,6 +7,7 @@ import { dateLocale } from '../i18n.ts';
 import { notifyError } from '../store.ts';
 import { useMedia } from '../tabs.ts';
 import { axis } from '../gestures.ts';
+import { isoWeek } from '../dates.ts';
 
 interface CalEvent {
   title: string;
@@ -135,7 +136,7 @@ function slotMove(ev: MouseEvent, d: Date) {
 }
 const title = computed(() =>
   props.mode === 'semaine'
-    ? t('agenda.cal.weekOf', { date: days.value[0].toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' }) })
+    ? t('agenda.cal.weekOf', { n: isoWeek(days.value[0]), date: days.value[0].toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' }) })
     : anchor.value.toLocaleDateString(dateLocale(), { month: 'long', year: 'numeric' }),
 );
 const weekdays = computed(() => days.value.slice(0, 7).map((d) => d.toLocaleDateString(dateLocale(), { weekday: 'short' })));
@@ -190,10 +191,11 @@ function place(e: Item) {
     </div>
 
     <div v-if="mode === 'mois'" :key="'m' + slideKey" :class="['month', slide && `slide-${slide}`]">
+      <span class="month-wd month-wn mono" :title="t('agenda.cal.weekNumber')">{{ t('agenda.cal.weekShort') }}</span>
       <span v-for="w in weekdays" :key="w" class="month-wd mono">{{ w }}</span>
+      <template v-for="(d, i) in days" :key="key(d)">
+      <span v-if="i % 7 === 0" class="month-wn mono" :aria-label="t('agenda.cal.weekN', { n: isoWeek(d) })">{{ isoWeek(d) }}</span>
       <button
-        v-for="d in days"
-        :key="key(d)"
         type="button"
         :class="['month-cell', { out: d.getMonth() !== anchor.getMonth(), today: key(d) === today, sel: phone && sel === key(d) }]"
         :aria-pressed="phone ? sel === key(d) : undefined"
@@ -215,6 +217,7 @@ function place(e: Item) {
         </span>
         <span v-if="(byDay.get(key(d)) ?? []).length > 3" class="muted more" style="font-size: 11px">+{{ (byDay.get(key(d)) ?? []).length - 3 }}</span>
       </button>
+      </template>
     </div>
 
     <!-- Phone: the diary. Month: the day tapped in the grid. Week: one page per day. -->
@@ -241,7 +244,7 @@ function place(e: Item) {
             </span>
           </button>
           <p v-if="!dayItems(k).length" class="tl-free">{{ t('agenda.cal.free') }}</p>
-          <button type="button" class="tl-add" @click="emit('create', k)">+ {{ t('agenda.addOn', { date: fromKey(k).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric' }) }) }}</button>
+          <button type="button" class="tl-add" :aria-label="t('agenda.addOn', { date: fromKey(k).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric' }) })" @click="emit('create', k)">+ {{ t('agenda.addShort') }}</button>
         </div>
       </div>
     </div>
