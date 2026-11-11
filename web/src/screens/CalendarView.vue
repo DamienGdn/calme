@@ -30,7 +30,13 @@ type Item = CalEvent & { kind: 'agenda' | 'proposed' | 'conflict' };
  * On the phone the week reads as a diary (one page per day) and the month as a dotted grid: tap a day to read it.
  */
 const props = defineProps<{ mode: 'semaine' | 'mois'; pending: PendingEvent[]; hidden?: string[] }>();
-const emit = defineEmits<{ open: [e: CalEvent & { fromMail?: string }] }>();
+const emit = defineEmits<{ open: [e: CalEvent & { fromMail?: string }]; create: [day: string, time?: string] }>();
+/** Week grid: a click on an empty spot creates an appointment at that hour. */
+function slotClick(ev: MouseEvent, d: Date) {
+  if (ev.target !== ev.currentTarget) return;
+  const h = DAY_START + Math.floor((ev.offsetY ?? 0) / HOUR_PX);
+  emit('create', key(d), `${String(Math.min(h, 23)).padStart(2, '0')}:00`);
+}
 const { t } = useI18n();
 
 const DAY_START = 7;
@@ -136,7 +142,9 @@ function place(e: Item) {
         :class="['month-cell', { out: d.getMonth() !== anchor.getMonth(), today: key(d) === today, sel: phone && sel === key(d) }]"
         :aria-pressed="phone ? sel === key(d) : undefined"
         @click="sel = key(d)"
+        @dblclick="emit('create', key(d))"
       >
+        <span v-if="!phone" class="cell-add" role="button" tabindex="0" :aria-label="t('agenda.addOn', { date: d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'long' }) })" @click.stop="emit('create', key(d))" @keydown.enter.stop="emit('create', key(d))">+</span>
         <span class="month-n">{{ d.getDate() }}</span>
         <span class="month-dots" aria-hidden="true"><i v-for="(e, i) in (byDay.get(key(d)) ?? []).slice(0, 3)" :key="i" :class="e.kind" :style="e.kind === 'agenda' && e.calendar ? { background: e.calendar.color } : undefined" /></span>
         <span
@@ -177,6 +185,7 @@ function place(e: Item) {
             </span>
           </button>
           <p v-if="!dayItems(k).length" class="tl-free">{{ t('agenda.cal.free') }}</p>
+          <button type="button" class="tl-add" @click="emit('create', k)">+ {{ t('agenda.addOn', { date: fromKey(k).toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric' }) }) }}</button>
         </div>
       </div>
     </div>
@@ -194,7 +203,7 @@ function place(e: Item) {
         <div class="week-hours">
           <span v-for="h in DAY_END - DAY_START" :key="h" class="mono" :style="{ height: `${HOUR_PX}px` }">{{ String(DAY_START + h - 1).padStart(2, '0') }}h</span>
         </div>
-        <div v-for="d in days" :key="'c' + key(d)" :class="['week-col', { today: key(d) === today }]" :style="{ backgroundSize: `100% ${HOUR_PX}px` }">
+        <div v-for="d in days" :key="'c' + key(d)" :class="['week-col', { today: key(d) === today }]" :title="t('agenda.addHere')" @click="slotClick($event, d)" :style="{ backgroundSize: `100% ${HOUR_PX}px` }">
           <span v-for="(e, i) in timed(d)" :key="i" :class="['week-ev', e.kind]" :style="{ ...place(e), ...(e.calendar ? { '--cal': e.calendar.color } : {}) }" @click="emit('open', e)" :title="`${hm(e.start)}–${hm(e.end)} · ${e.title}`">
             <span class="mono">{{ hm(e.start) }}</span>
             <span>{{ e.title }}</span>

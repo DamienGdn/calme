@@ -742,11 +742,9 @@ html { touch-action: manipulation; }
 .month-title::first-letter { text-transform: uppercase; }
 button.tl-ev { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; background: transparent; }
 button.tl-ev:hover { background: var(--surf2); }
-.tl-ev.agenda { border-left: 3px solid var(--cal, var(--line)); }
 .tl-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .tl-title { font-size: 15px; overflow-wrap: anywhere; }
 .tl-cal { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
-.week-ev.agenda, .chip-ev.agenda { border-left: 3px solid var(--cal, var(--line)); cursor: pointer; }
 .week-ev, .chip-ev { cursor: pointer; }
 @media (min-width: 721px) {
   .tl-ev { grid-template-columns: 120px minmax(0, 1fr); }
@@ -754,7 +752,7 @@ button.tl-ev:hover { background: var(--surf2); }
 }
 @media (max-width: 720px) {
   .month-title { top: env(safe-area-inset-top, 0px); font-size: 22px; }
-  .tl-ev.agenda { border-left-color: var(--cal, var(--line)); background: var(--surf); }
+  .tl-ev.agenda { border-left-color: transparent; background: var(--surf); }
   .agenda-tools .tones { align-self: stretch; }
   .cal-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
   .cal-chips::-webkit-scrollbar { display: none; }
@@ -803,3 +801,19 @@ button.tl-ev:hover { background: var(--surf2); }
 .wordmark { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; font-weight: 500; font-size: 24px; letter-spacing: -0.02em; line-height: 1; }
 .wordmark-dot { color: var(--accent-text); }
 html { font-optical-sizing: auto; }
+
+/* Calendars are told apart by a small dot in their colour (no coloured borders). */
+.week-ev.agenda { padding-right: 16px; }
+.week-ev.agenda::after { content: ''; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--cal, var(--muted)); }
+.chip-ev.agenda::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: var(--cal, var(--muted)); vertical-align: 1px; }
+/* Creating from the week and month views. */
+.week-col { cursor: copy; }
+.week-col .week-ev { cursor: pointer; }
+.month-cell { position: relative; }
+.cell-add { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1; color: var(--prim-fg); background: var(--prim-bg); opacity: 0; transition: opacity 0.15s; cursor: pointer; }
+.month-cell:hover .cell-add, .cell-add:focus-visible { opacity: 1; }
+.tl-add { align-self: flex-start; margin-top: 2px; padding: 6px 2px; border: 0; background: none; color: var(--accent-text); font: 500 13px var(--text, inherit); cursor: pointer; }
+.tl-add::first-letter { text-transform: none; }
+
+.ev-confirm { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--danger); }
+.ev-confirm p { margin: 0; font-size: 14px; line-height: 1.5; }

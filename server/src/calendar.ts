@@ -47,6 +47,8 @@ export interface CalendarPort {
   upcoming(days: number): Promise<CalEvent[]>;
   range(from: string, to: string): Promise<CalEvent[]>;
   create(e: NewEvent): Promise<{ link: string }>;
+  /** Deletes an appointment (Google keeps it in the calendar's trash for 30 days). Guests are not notified. */
+  remove(calendarId: string, eventId: string): Promise<void>;
 }
 
 export const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Paris';
@@ -154,6 +156,9 @@ export function createCalendarPort(auth: OAuth2Client): CalendarPort {
         }),
       );
       return { link: res.data.htmlLink ?? '' };
+    },
+    async remove(calendarId, eventId) {
+      await guard(api.events.delete({ calendarId, eventId, sendUpdates: 'none' }));
     },
   };
   return port;

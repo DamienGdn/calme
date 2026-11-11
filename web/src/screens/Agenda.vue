@@ -38,6 +38,11 @@ const { t } = useI18n();
 const view = ref<{ connected: boolean; events: CalEvent[]; proposals: Proposal[]; calendars: CalInfo[]; limitedCalendars: boolean } | null>(null);
 const busy = ref<string | null>(null);
 const form = ref(false);
+const formAt = ref<{ day?: string; time?: string }>({});
+function openForm(day?: string, time?: string) {
+  formAt.value = { day, time };
+  form.value = true;
+}
 const opened = ref<OpenEvent | null>(null);
 const mode = ref<'liste' | 'semaine' | 'mois'>('liste');
 
@@ -154,13 +159,31 @@ const months = computed(() => {
     }));
 });
 const writable = computed(() => (view.value?.calendars ?? []).filter((c) => c.writable));
+const canDelete = (e: OpenEvent) => Boolean(e.id && e.calendar?.id && writable.value.some((c) => c.id === e.calendar!.id));
+const deleting = ref(false);
+async function removeOpened() {
+  const e = opened.value;
+  if (!e?.id || !e.calendar?.id) return;
+  deleting.value = true;
+  try {
+    await api(`/api/agenda/events/${encodeURIComponent(e.calendar.id)}/${encodeURIComponent(e.id)}`, { method: 'DELETE' });
+    notify(t('agenda.deleted', { title: e.title }));
+    opened.value = null;
+    listEvents.value = (listEvents.value ?? []).filter((x) => x.id !== e.id);
+    reload();
+  } catch (err) {
+    notifyError(err);
+  } finally {
+    deleting.value = false;
+  }
+}
 watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(todayKey, until.value));
 </script>
 
 <template>
   <header class="topbar">
     <span class="eyebrow">{{ t('agenda.eyebrow') }}</span>
-    <button type="button" class="btn btn-prim" :aria-label="t('agenda.newEvent')" @click="form = true"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
+    <button type="button" class="btn btn-prim" :aria-label="t('agenda.newEvent')" @click="openForm()"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
   </header>
 
   <h1 class="headline" style="max-width: 18ch">
@@ -180,8 +203,8 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
     <a class="btn" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.reconnect') }}</a>
   </div>
 
-  <NewEvent v-if="form" :calendars="writable" @close="form = false" @done="form = false; reload()" />
-  <EventSheet v-if="opened" :event="opened" @close="opened = null" />
+  <NewEvent v-if="form" :day="formAt.day" :time="formAt.time" :calendars="writable" @close="form = false" @done="form = false; reload()" />
+  <EventSheet v-if="opened" :event="opened" :can-delete="canDelete(opened)" :busy="deleting" @close="opened = null" @delete="removeOpened" />
 
   <div class="agenda-tools">
     <div class="tones" role="radiogroup" :aria-label="t('agenda.view')">
@@ -196,7 +219,7 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
     </div>
   </div>
 
-  <CalendarView v-if="mode !== 'liste'" :key="mode" :mode="mode" :pending="pendingEvents" :hidden="[...hidden]" @open="(e) => (opened = e)" />
+  <CalendarView v-if="mode !== 'liste'" :key="mode" :mode="mode" :pending="pendingEvents" :hidden="[...hidden]" @open="(e) => (opened = e)" @create="openForm" />
 
   <template v-else>
     <section v-if="view?.proposals.length" aria-labelledby="found" class="found">

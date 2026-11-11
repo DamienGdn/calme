@@ -495,6 +495,16 @@ export function createApp(d: Deps) {
     );
   });
 
+  // Delete an appointment, only from a calendar Calm may write to.
+  app.delete('/api/agenda/events/:calendarId/:eventId', async (c) => {
+    const cal = d.calendar?.();
+    if (!cal) throw new GmailDisconnected();
+    const calendarId = c.req.param('calendarId');
+    if (!(await cal.calendars()).list.some((x) => x.id === calendarId && x.writable)) return c.json({ error: 'Agenda inconnu ou en lecture seule' }, 400);
+    await cal.remove(calendarId, c.req.param('eventId'));
+    return c.json({ ok: true });
+  });
+
   // French address suggestions (Base Adresse Nationale, served by IGN's Géoplateforme). Only the typed text is sent.
   app.get('/api/address', async (c) => {
     const q = (c.req.query('q') ?? '').trim().slice(0, 200);

@@ -78,6 +78,9 @@ function setup(gmailConnected = true) {
         created.push(e);
         return { link: 'https://calendar.google.com/event?eid=x' };
       },
+      remove: async (calendarId: string, eventId: string) => {
+        created.push({ removed: { calendarId, eventId } });
+      },
     }),
     backup: { dir: join(bkRoot, 'backups'), dbPath: join(bkRoot, 'calme.db') },
     remote: { status: async () => ({ installed: true, serving: false, url: null }), enable: async () => ({ url: 'https://mac.tail.ts.net' }) },
@@ -757,5 +760,23 @@ describe('several calendars', () => {
     expect(created.at(-1)).toMatchObject({ calendarId: 'famille-id' });
     expect((await post({ ...base, calendarId: 'feries-id' })).status).toBe(400);
     expect((await post({ ...base, calendarId: 'inconnu' })).status).toBe(400);
+  });
+});
+
+describe('delete an appointment', () => {
+  const del = (app: ReturnType<typeof setup>['app'], cal: string, id: string) =>
+    app.request(`/api/agenda/events/${encodeURIComponent(cal)}/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth });
+
+  it('deletes it from its calendar', async () => {
+    const { app, created } = setup();
+    expect((await del(app, 'famille-id', 'ev123')).status).toBe(200);
+    expect(created.at(-1)).toEqual({ removed: { calendarId: 'famille-id', eventId: 'ev123' } });
+  });
+
+  it('refuses a calendar Calm may not write to, or does not know', async () => {
+    const { app, created } = setup();
+    expect((await del(app, 'feries-id', 'ev1')).status).toBe(400);
+    expect((await del(app, 'inconnu', 'ev1')).status).toBe(400);
+    expect(created.some((c) => 'removed' in (c as object))).toBe(false);
   });
 });

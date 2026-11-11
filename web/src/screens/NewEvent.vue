@@ -9,7 +9,7 @@ import { notify, notifyError } from '../store.ts';
  * Appointment sheet: title, all day or times (the end follows the start), place with French address suggestions
  * (Base Adresse Nationale), reminder and notes. Bottom sheet on the phone, dialog on the computer.
  */
-const props = defineProps<{ day?: string; calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
+const props = defineProps<{ day?: string; time?: string; calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
 const emit = defineEmits<{ done: []; close: [] }>();
 const { t } = useI18n();
 
@@ -25,8 +25,8 @@ const title = ref('');
 const allDay = ref(false);
 const startDay = ref(props.day ?? tomorrow);
 const endDay = ref(props.day ?? tomorrow);
-const from = ref('10:00');
-const to = ref('11:00');
+const from = ref(props.time ?? '10:00');
+const to = ref(props.time ? `${String(Math.min(23, Number(props.time.slice(0, 2)) + 1)).padStart(2, '0')}:${props.time.slice(3, 5)}` : '11:00');
 const place = ref('');
 const coords = ref<{ lat: number; lon: number } | null>(null);
 const reminder = ref<number | null>(30);

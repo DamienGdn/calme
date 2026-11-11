@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { dateLocale } from '../i18n.ts';
 import Icon from './Icon.vue';
 
 /** An appointment, opened from the agenda: when, which calendar, where (with a map link), notes, Google link. */
 export interface OpenEvent {
+  id?: string;
   title: string;
   start: string;
   end: string;
@@ -13,12 +14,13 @@ export interface OpenEvent {
   location?: string | null;
   description?: string | null;
   link?: string | null;
-  calendar?: { name: string; color: string; primary: boolean };
+  calendar?: { id?: string; name: string; color: string; primary: boolean };
   /** Proposed by a mail, not yet in the calendar. */
   fromMail?: string;
 }
-const props = defineProps<{ event: OpenEvent }>();
-const emit = defineEmits<{ close: [] }>();
+const props = defineProps<{ event: OpenEvent; canDelete?: boolean; busy?: boolean }>();
+const emit = defineEmits<{ close: []; delete: [] }>();
+const confirming = ref(false);
 const { t } = useI18n();
 
 const when = computed(() => {
@@ -62,7 +64,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
       </p>
       <p v-if="event.fromMail" class="muted" style="margin: 0; font-size: 14px">{{ event.fromMail }}</p>
       <div v-if="event.description" class="ev-desc">{{ event.description }}</div>
-      <a v-if="event.link" class="btn" :href="event.link" target="_blank" rel="noopener noreferrer" style="align-self: flex-start">{{ t('agenda.openInGoogle') }} ↗</a>
+      <template v-if="canDelete">
+        <button v-if="!confirming" type="button" class="btn btn-danger" style="align-self: flex-start" @click="confirming = true">
+          <Icon name="trash" :size="16" /> {{ t('agenda.delete') }}
+        </button>
+        <div v-else class="ev-confirm" role="alert">
+          <p>{{ t('agenda.deleteConfirm') }}</p>
+          <span style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button type="button" class="btn" @click="confirming = false">{{ t('common.cancel') }}</button>
+            <button type="button" class="btn btn-danger" :disabled="busy" @click="emit('delete')"><Icon name="trash" :size="16" /> {{ t('agenda.deleteYes') }}</button>
+          </span>
+        </div>
+      </template>
     </article>
   </div>
 </template>
