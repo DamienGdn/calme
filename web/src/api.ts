@@ -16,6 +16,8 @@ export interface AppState {
   running: boolean;
   error: string | null;
   language?: 'fr' | 'en';
+  /** Load the images of formatted mails (Admin › App). */
+  remoteImages?: boolean;
   setupDone?: boolean;
 }
 

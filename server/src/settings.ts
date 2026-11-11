@@ -20,6 +20,8 @@ export interface Settings {
   pushMode: PushMode;
   quietStart: number | null;
   quietEnd: number | null;
+  /** Load the images of formatted mails (some senders use them to know a mail was opened). */
+  remoteImages: boolean;
   model: string;
   intervalMin: number;
 }
@@ -27,7 +29,7 @@ export interface Settings {
 /** User-editable settings (admin page), stored in the database; env/config values are the defaults. */
 export function getSettings(s: Store, defaults: { model: string; intervalMin: number }): Settings {
   const saved = JSON.parse(s.getMeta('settings') ?? '{}') as Partial<Settings>;
-  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, ...defaults, ...saved };
+  return { autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, ...defaults, ...saved };
 }
 
 export function saveSettings(s: Store, patch: Partial<Settings>): void {
@@ -60,6 +62,7 @@ export function saveSettings(s: Store, patch: Partial<Settings>): void {
     next[k] = v;
   }
   if (patch.autoUnsubscribe !== undefined) next.autoUnsubscribe = Boolean(patch.autoUnsubscribe);
+  if (patch.remoteImages !== undefined) next.remoteImages = Boolean(patch.remoteImages);
   if (patch.keepSenders !== undefined) {
     if (!Array.isArray(patch.keepSenders)) throw new Error('keepSenders doit être une liste');
     next.keepSenders = [...new Set(patch.keepSenders.map((e) => String(e).trim().toLowerCase()).filter(Boolean))];

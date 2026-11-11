@@ -203,6 +203,7 @@ export function createApp(d: Deps) {
       lastSync: Number(store.getMeta('lastSync') ?? 0) || null,
       analyzing: store.countUnanalyzed(),
       language: getSettings(store, defaults()).language,
+      remoteImages: getSettings(store, defaults()).remoteImages,
       setupDone: store.getMeta('setupDone') === '1',
       running: st.running,
       error: st.error,

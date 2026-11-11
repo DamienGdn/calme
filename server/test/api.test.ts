@@ -460,7 +460,7 @@ describe('api admin', () => {
     const body = await (await app.request('/api/admin', { headers: auth })).json();
     expect(body.claude).toEqual({ installed: true, version: '2.1.322 (Claude Code)' });
     expect(body.google.connected).toBe(true);
-    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, model: 'haiku', intervalMin: 5 });
+    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, model: 'haiku', intervalMin: 5 });
   });
 
   it('validates and saves settings', async () => {
@@ -601,5 +601,15 @@ describe('formatted mail (HTML)', () => {
     const { app, store } = setup();
     store.upsertMessages([mail('plain1')]);
     expect(await (await app.request('/api/mail/plain1/html', { headers: auth })).json()).toEqual({ html: null });
+  });
+});
+
+describe('remote images setting', () => {
+  it('shows remote images by default and can block them; every screen learns it from the state', async () => {
+    const { app } = setup();
+    expect((await (await app.request('/api/state', { headers: auth })).json()).remoteImages).toBe(true);
+    const put = await app.request('/api/admin/settings', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ remoteImages: false }) });
+    expect(put.status).toBe(200);
+    expect((await (await app.request('/api/state', { headers: auth })).json()).remoteImages).toBe(false);
   });
 });

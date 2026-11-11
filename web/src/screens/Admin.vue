@@ -23,6 +23,7 @@ interface Settings {
   pushMode: 'all' | 'reply' | 'off';
   quietStart: number | null;
   quietEnd: number | null;
+  remoteImages: boolean;
 }
 interface AdminView {
   claude: { installed: boolean; version: string | null };
@@ -69,6 +70,7 @@ async function save(patch: Partial<Settings> | Record<string, unknown>, msg = t(
     const settings = await api<Settings>('/api/admin/settings', { method: 'PUT', body: JSON.stringify(patch) });
     if (v.value) v.value.settings = settings;
     notify(msg);
+    void refresh();
   } catch (e) {
     notifyError(e);
   }
@@ -170,6 +172,11 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           </div>
           <span class="muted" style="font-size: 12px">{{ t('admin.themeNote') }}</span>
         </div>
+        <label class="switch">
+          <input type="checkbox" :checked="v.settings.remoteImages" @change="save({ remoteImages: ($event.target as HTMLInputElement).checked })" />
+          {{ t('admin.remoteImages') }}
+        </label>
+        <span class="muted" style="font-size: 12px; margin-top: -6px">{{ t('admin.remoteImagesNote') }}</span>
         <label style="display: flex; flex-direction: column; gap: 6px">
           <span class="eyebrow">{{ t('admin.language') }}</span>
           <select class="select" :value="locale" @change="changeLang(($event.target as HTMLSelectElement).value as Lang)">

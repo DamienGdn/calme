@@ -2,16 +2,19 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api } from '../api.ts';
+import { store } from '../store.ts';
 
 /**
  * A mail's body: its formatted version (HTML cleaned by the server) in a sealed frame — no scripts, no forms, links
  * open outside, remote images blocked until asked for (they often report that the mail was opened). Mails without
- * HTML show their text with clickable links.
+ * HTML show their text with clickable links. Images load unless the user blocked them in Admin › App (some senders
+ * use them to know a mail was opened); then a button shows them for this mail.
  */
 const props = defineProps<{ mailId: string; text: string | null }>();
 const { t } = useI18n();
 const html = ref<string | null | undefined>(undefined);
-const images = ref(false);
+const imagesByDefault = () => store.state?.remoteImages ?? true;
+const images = ref(imagesByDefault());
 const frame = ref<HTMLIFrameElement | null>(null);
 const height = ref(120);
 
@@ -19,7 +22,7 @@ watch(
   () => props.mailId,
   async (id) => {
     html.value = undefined;
-    images.value = false;
+    images.value = imagesByDefault();
     try {
       html.value = (await api<{ html: string | null }>(`/api/mail/${encodeURIComponent(id)}/html`)).html;
     } catch {
