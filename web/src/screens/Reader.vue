@@ -8,6 +8,8 @@ import { notify, notifyError, openEditor } from '../store.ts';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
 import { isUnread } from '../unread.ts';
+import { actionKinds } from '../actions.ts';
+import { useUnsubscribe } from '../unsub.ts';
 import UnsubBar from './UnsubBar.vue';
 import ReminderSheet from '../components/ReminderSheet.vue';
 
@@ -20,6 +22,9 @@ const body = useMailBody(toRef(() => props.mail.id));
 const labels = ref<{ id: string; name: string }[] | null>(null);
 const menu = ref(false);
 const remind = ref(false);
+/** The suggested action as buttons that do it (unsubscribe, delete, archive, answer, remind me). */
+const kinds = computed(() => (a.value?.action ? actionKinds(a.value.action) : []));
+const unsub = useUnsubscribe(() => props.mail);
 const eventLink = ref<string | null>(null);
 
 async function openMenu() {
@@ -85,6 +90,15 @@ function eventDate(start: string, end: string) {
       </ol>
       <a v-if="a.action && actionLinks.get(mail.id)" class="act act-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">→ {{ a.action }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }} ↗</span></a>
       <span v-else-if="a.action" class="act">→ {{ a.action }}</span>
+      <div v-if="kinds.length" class="act-buttons">
+        <button v-if="kinds.includes('unsub')" type="button" class="btn btn-prim" :disabled="unsub.status.value !== 'idle'" @click="unsub.go()">
+          <Icon name="unsub" :size="16" /> {{ unsub.status.value === 'done' ? t('reader.unsubscribed') : unsub.status.value === 'busy' ? t('reader.unsubscribing') : t('reader.unsubscribe') }}
+        </button>
+        <button v-if="kinds.includes('trash')" type="button" class="btn btn-danger" :disabled="busy" @click="emit('trash')"><Icon name="trash" :size="16" /> {{ t('reader.trash') }}</button>
+        <button v-if="kinds.includes('archive')" type="button" class="btn" :disabled="busy" @click="emit('archive')"><Icon name="archive" :size="16" /> {{ t('reader.archive') }}</button>
+        <button v-if="kinds.includes('reply')" type="button" class="btn" @click="openEditor({ mailId: mail.id, text: '' })"><Icon name="pen" :size="16" /> {{ t('common.write') }}</button>
+        <button v-if="kinds.includes('remind')" type="button" class="btn" @click="remind = true"><Icon name="clock" :size="16" /> {{ t('reader.remind') }}</button>
+      </div>
     </section>
 
     <section v-if="a?.event" class="event-card" :aria-label="t('reader.eventFound')">

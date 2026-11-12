@@ -1,31 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { post, type MailItem } from '../api.ts';
-import { notify, notifyError } from '../store.ts';
+import { type MailItem } from '../api.ts';
+import { useUnsubscribe } from '../unsub.ts';
 
 const props = defineProps<{ mail: MailItem }>();
 const { t } = useI18n();
-const status = ref<'idle' | 'busy' | 'done'>('idle');
+const { status, go } = useUnsubscribe(() => props.mail);
 const link = computed(() => [props.mail.unsub?.httpUrl, props.mail.unsub?.oneClickUrl].find((u) => u && /^https:/i.test(u)));
-
-async function go() {
-  status.value = 'busy';
-  try {
-    const r = await post<{ unsubscribed: number; toOpen: string[] }>('/api/newsletters/unsubscribe', { senders: [props.mail.fromEmail] });
-    if (r.unsubscribed) {
-      status.value = 'done';
-      notify(t('reader.unsubDone', { name: props.mail.fromName }));
-    } else {
-      status.value = 'idle';
-      if (r.toOpen[0]) window.open(r.toOpen[0], '_blank', 'noopener,noreferrer');
-      notify(t('reader.unsubConfirm'));
-    }
-  } catch (e) {
-    status.value = 'idle';
-    notifyError(e);
-  }
-}
 </script>
 
 <template>

@@ -4,11 +4,13 @@ import { useI18n } from 'vue-i18n';
 import { api, fullDate, post, useMailBody, when } from '../api.ts';
 import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
 import Icon from '../components/Icon.vue';
+import FolderSheet from '../components/FolderSheet.vue';
 import SenderAvatar from '../components/SenderAvatar.vue';
+import { pickWith, toggleKey } from '../selection.ts';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
 import { dateLocale } from '../i18n.ts';
-import { goTo, notifyError } from '../store.ts';
+import { goTo, notify, notifyError, refresh } from '../store.ts';
 import { useMedia } from '../tabs.ts';
 
 interface Result {
@@ -145,6 +147,96 @@ function submit() {
   (document.activeElement as HTMLElement | null)?.blur();
 }
 
+// Selection over the results (any mail of the mailbox): "Select" on the phone, ⌘/Ctrl-click and ⇧-click on a
+// computer, ⌘/Ctrl+A for all; then move to a folder or trash (with Undo).
+const selected = ref(new Set<string>());
+const selectMode = ref(false);
+const selecting = computed(() => selectMode.value || selected.value.size > 0);
+let anchor: string | null = null;
+const ids = () => listed.value.map((r) => r.id);
+function endSelection() {
+  selected.value = new Set();
+  selectMode.value = false;
+  anchor = null;
+}
+watch(listed, (l) => {
+  const keep = new Set(l.map((r) => r.id));
+  if ([...selected.value].some((id) => !keep.has(id))) selected.value = new Set([...selected.value].filter((id) => keep.has(id)));
+});
+function onRow(e: MouseEvent, r: Result) {
+  if (e.shiftKey) selected.value = pickWith(selected.value, ids(), r.id, anchor, 'range');
+  else if (toggleKey(e) || selecting.value) selected.value = pickWith(selected.value, ids(), r.id, anchor, 'toggle');
+  else return read(r);
+  anchor = r.id;
+}
+/** Takes mails out of the lists shown (after a move or a trash); `back` puts them back (Undo). */
+function drop(gone: Set<string>) {
+  const keep = (l: Result[]) => l.filter((r) => !gone.has(r.id));
+  const before = { quick: quick.value, res: res.value };
+  if (quick.value) quick.value = keep(quick.value);
+  if (res.value) res.value = { ...res.value, results: keep(res.value.results) };
+  if (open.value && gone.has(open.value.id)) open.value = null;
+  return () => {
+    quick.value = before.quick;
+    res.value = before.res;
+  };
+}
+const working = ref(false);
+async function trashSelected() {
+  const list = [...selected.value];
+  if (!list.length || working.value) return;
+  working.value = true;
+  try {
+    await post('/api/mails/trash', { ids: list });
+    const back = drop(new Set(list));
+    endSelection();
+    void refresh();
+    notify(t('triage.trashedMany', list.length), false, {
+      label: t('common.undo'),
+      run: async () => {
+        try {
+          await post('/api/mails/untrash', { ids: list });
+          back();
+          notify(t('triage.restored', list.length));
+          void refresh();
+        } catch (e) {
+          notifyError(e);
+        }
+      },
+    });
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    working.value = false;
+  }
+}
+const moving = ref(false);
+async function moveSelected(l: { id: string; name: string }) {
+  const list = [...selected.value];
+  moving.value = false;
+  if (!list.length) return;
+  working.value = true;
+  try {
+    await post('/api/mails/move', { ids: list, labelId: l.id });
+    drop(new Set(list));
+    endSelection();
+    void refresh();
+    notify(t('folders.moved', { n: list.length, name: l.name }, list.length));
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    working.value = false;
+  }
+}
+const onSelKey = (e: KeyboardEvent) => {
+  const target = e.target as HTMLElement | null;
+  const onPage = !target || target === document.body || Boolean(target.closest('.row'));
+  if (toggleKey(e) && e.key.toLowerCase() === 'a' && onPage && listed.value.length) {
+    e.preventDefault();
+    selected.value = new Set(ids());
+  } else if (e.key === 'Escape' && selecting.value) endSelection();
+};
+
 // Opening a mail adds a history step on the phone: the back gesture returns to the results, not out of the search.
 const phone = useMedia('(max-width: 720px)');
 function closeMail() {
@@ -155,8 +247,14 @@ const onPop = () => {
   if (!history.state?.calmReading) open.value = null;
 };
 // Kept alive between tabs (App.vue): the back gesture is listened to only while the screen shows.
-onActivated(() => window.addEventListener('popstate', onPop));
-onDeactivated(() => window.removeEventListener('popstate', onPop));
+onActivated(() => {
+  window.addEventListener('popstate', onPop);
+  window.addEventListener('keydown', onSelKey);
+});
+onDeactivated(() => {
+  window.removeEventListener('popstate', onPop);
+  window.removeEventListener('keydown', onSelKey);
+});
 </script>
 
 <template>
@@ -220,11 +318,31 @@ onDeactivated(() => window.removeEventListener('popstate', onPop));
   </template>
 
   <template v-if="listed.length || open">
-    <span v-if="showQuick && !(phone && open)" class="eyebrow">{{ t('search.inMails') }} · {{ listed.length }}</span>
+    <div v-if="!(phone && open)" class="search-list-head">
+      <span class="eyebrow">{{ showQuick ? t('search.inMails') : t('search.found') }} · {{ listed.length }}</span>
+      <button v-if="!selecting && listed.length" type="button" class="linkish" @click="selectMode = true">{{ t('search.select') }}</button>
+    </div>
+    <div v-if="selecting" class="selbar" role="toolbar" :aria-label="t('triage.selection')">
+      <button type="button" class="btn btn-icon" :aria-label="t('triage.clearSelection')" @click="endSelection">×</button>
+      <span class="grow">{{ t('triage.selected', selected.size) }}</span>
+      <button type="button" class="btn" @click="selected = new Set(ids())">{{ t('triage.selectAll') }}</button>
+      <button type="button" class="btn" :disabled="!selected.size || working" @click="moving = true"><Icon name="move" :size="16" /> {{ t('triage.move') }}</button>
+      <button type="button" class="btn btn-danger" :disabled="!selected.size || working" @click="trashSelected"><Icon name="trash" :size="16" /> {{ t('triage.trashShort') }}</button>
+    </div>
+    <FolderSheet v-if="moving" mode="pick" :title="t('folders.moveTitle')" @close="moving = false" @pick="moveSelected" />
     <div :class="['split', { reading: open }]">
       <section class="list" :aria-label="t('search.found')">
-        <button v-for="r in listed" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="read(r)">
-          <SenderAvatar :name="r.fromName" :email="r.fromEmail" :tag="r.relevant ? 'var(--accent)' : undefined" />
+        <button
+          v-for="r in listed"
+          :key="r.id"
+          type="button"
+          :class="['row', { picked: selected.has(r.id) }]"
+          :aria-current="!selecting && open?.id === r.id"
+          :aria-pressed="selecting ? selected.has(r.id) : undefined"
+          @click="onRow($event, r)"
+        >
+          <span v-if="selecting" class="pick" aria-hidden="true"><Icon v-if="selected.has(r.id)" name="check" :size="12" /></span>
+          <SenderAvatar v-else :name="r.fromName" :email="r.fromEmail" :tag="r.relevant ? 'var(--accent)' : undefined" />
           <span class="from">{{ r.fromName }}</span>
           <span class="time">{{ when(r.date) }}</span>
           <span class="subj">{{ r.subject || t('common.noSubject') }}</span>
