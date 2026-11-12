@@ -502,7 +502,10 @@ export function createApp(d: Deps) {
   app.post('/api/search', async (c) => {
     const { question } = await c.req.json<{ question?: string }>();
     if (!question?.trim()) return c.json({ error: 'Pose une question' }, 400);
-    return c.json(await searchMail(d.runner, d.gmail(), question.slice(0, 500), d.archive));
+    const cal = d.calendar?.();
+    const hidden = new Set(getSettings(store, defaults()).hiddenCalendars);
+    const agenda = cal ? { search: async (q: string, from: string, to: string) => (await cal.search(q, from, to)).filter((e) => !e.calendar || !hidden.has(e.calendar.id)) } : undefined;
+    return c.json(await searchMail(d.runner, d.gmail(), question.slice(0, 500), d.archive, agenda));
   });
 
   // Reminders: things to do later, typed in or taken from a mail ("not now").

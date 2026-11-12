@@ -2,9 +2,11 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { fullDate, post, useMailBody, when } from '../api.ts';
+import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
 import Icon from '../components/Icon.vue';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
+import { dateLocale } from '../i18n.ts';
 import { goTo, notifyError } from '../store.ts';
 import { useMedia } from '../tabs.ts';
 
@@ -28,6 +30,8 @@ interface SearchResponse {
   /** Short timeline "date — fact" when several mails matter. */
   points?: string[];
   results: Result[];
+  /** Appointments of the agenda (a year back and ahead) that match. */
+  events?: OpenEvent[];
 }
 
 const props = defineProps<{ initial: string }>();
@@ -36,6 +40,12 @@ const question = ref(props.initial);
 const res = ref<SearchResponse | null>(null);
 const busy = ref(false);
 const open = ref<Result | null>(null);
+const openedEvent = ref<OpenEvent | null>(null);
+const evWhen = (e: OpenEvent) =>
+  e.allDay
+    ? new Date(e.start + 'T12:00:00').toLocaleDateString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    : new Date(e.start).toLocaleString(dateLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const upcoming = (e: OpenEvent) => Date.parse(e.allDay ? e.start + 'T23:59:59' : e.end) >= Date.now();
 const body = useMailBody(
   toRef(() => open.value?.id),
   toRef(() => (open.value?.source === 'local' ? 'archive' : 'gmail')),
@@ -159,6 +169,17 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
       </details>
       <span class="mono muted" style="font-size: 12px">{{ t('search.query', { q: res.query, n: t('common.mails', res.results.length) }) }}</span>
     </section>
+
+    <section v-if="res.events?.length && !(phone && open)" class="search-events" :aria-label="t('search.events')">
+      <h2 class="eyebrow" style="margin: 0; font-weight: 500; display: flex; align-items: center; gap: 8px"><Icon name="calendar" :size="14" /> {{ t('search.events') }}</h2>
+      <button v-for="(e, i) in res.events" :key="e.id ?? i" type="button" :class="['search-ev', { past: !upcoming(e) }]" @click="openedEvent = e">
+        <i :style="{ background: e.calendar?.color ?? 'var(--accent)' }" aria-hidden="true" />
+        <span class="mono">{{ evWhen(e) }}</span>
+        <span class="search-ev-title">{{ e.title }}</span>
+        <span v-if="e.location" class="muted ellipsis">{{ e.location }}</span>
+      </button>
+    </section>
+    <EventSheet v-if="openedEvent" :event="openedEvent" @close="openedEvent = null" />
 
     <div :class="['split', { reading: open }]">
       <section class="list" :aria-label="t('search.found')">

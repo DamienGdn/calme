@@ -980,3 +980,13 @@ html.kb-open .fab { display: none; }
 .remind-due::first-letter { text-transform: uppercase; }
 .remind-foot { display: flex; justify-content: flex-end; gap: 10px; }
 .agenda-brief .points li { grid-template-columns: 110px minmax(0, 1fr); }
+
+/* Search: appointments found in the agenda, under the answer. */
+.search-events { display: flex; flex-direction: column; gap: 4px; }
+.search-ev { display: grid; grid-template-columns: 10px auto minmax(0, 1fr); align-items: baseline; column-gap: 10px; row-gap: 2px; width: 100%; padding: 12px 10px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; color: var(--ink); }
+.search-ev i { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.search-ev .mono { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.search-ev-title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-ev .muted { grid-column: 2 / 4; font-size: 13px; }
+.search-ev.past { opacity: 0.6; }
+@media (max-width: 720px) { .search-ev { grid-template-columns: 10px minmax(0, 1fr); } .search-ev-title, .search-ev .muted { grid-column: 2; } }

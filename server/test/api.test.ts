@@ -83,6 +83,7 @@ function setup(gmailConnected = true) {
         limited: false,
       }),
       upcoming: async () => [{ title: 'Dentiste', start: '2026-11-14T10:00:00+01:00', end: '2026-11-14T11:00:00+01:00', allDay: false }],
+      search: async () => [],
       range: async (from: string, to: string) => [{ title: `Du ${from.slice(0, 10)} au ${to.slice(0, 10)}`, start: '2026-12-01', end: '2026-12-02', allDay: true }],
       create: async (e) => {
         created.push(e);

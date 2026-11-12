@@ -46,6 +46,8 @@ export interface CalendarPort {
   calendars(): Promise<{ list: CalInfo[]; limited: boolean }>;
   upcoming(days: number): Promise<CalEvent[]>;
   range(from: string, to: string): Promise<CalEvent[]>;
+  /** Appointments whose title, notes, place or guests match the words (Google's own search), between two dates. */
+  search(q: string, from: string, to: string): Promise<CalEvent[]>;
   create(e: NewEvent): Promise<{ link: string }>;
   /** Changes an appointment in place; fields left out of the form keep their value (reminders when not given). */
   update(calendarId: string, eventId: string, e: NewEvent): Promise<{ link: string }>;
@@ -130,31 +132,8 @@ export function createCalendarPort(auth: OAuth2Client): CalendarPort {
       const now = new Date();
       return port.range(now.toISOString(), new Date(now.getTime() + days * 86400_000).toISOString());
     },
-    async range(from, to) {
-      const { list } = await port.calendars();
-      const perCalendar = await Promise.all(
-        list.map(async (cal) => {
-          const res = await guard(
-            api.events.list({ calendarId: cal.id, timeMin: from, timeMax: to, singleEvents: true, orderBy: 'startTime', maxResults: 250 }),
-          );
-          return (res.data.items ?? [])
-            .filter((e) => e.status !== 'cancelled')
-            .map((e) => ({
-              title: e.summary || '(sans titre)',
-              start: e.start?.dateTime ?? e.start?.date ?? '',
-              end: e.end?.dateTime ?? e.end?.date ?? '',
-              allDay: !e.start?.dateTime,
-              id: e.id ?? undefined,
-              location: e.location ?? null,
-              // Google keeps notes as light HTML: shown as plain text.
-              description: e.description ? (/<[a-z]/i.test(e.description) ? htmlToText(e.description) : e.description).slice(0, 4000) : null,
-              link: e.htmlLink ?? null,
-              calendar: { id: cal.id, name: cal.name, color: cal.color, primary: cal.primary },
-            }));
-        }),
-      );
-      return perCalendar.flat().sort((x, y) => x.start.localeCompare(y.start));
-    },
+    range: (from, to) => list(from, to),
+    search: (q, from, to) => list(from, to, q),
     async create(e) {
       const res = await guard(api.events.insert({ calendarId: e.calendarId ?? 'primary', requestBody: body(e) }));
       return { link: res.data.htmlLink ?? '' };
@@ -167,6 +146,34 @@ export function createCalendarPort(auth: OAuth2Client): CalendarPort {
       await guard(api.events.delete({ calendarId, eventId, sendUpdates: 'none' }));
     },
   };
+
+  /** Events of every calendar between two dates (and matching `q` when given), sorted by start. */
+  async function list(from: string, to: string, q?: string): Promise<CalEvent[]> {
+    const { list: cals } = await port.calendars();
+    const perCalendar = await Promise.all(
+      cals.map(async (cal) => {
+        const res = await guard(
+          api.events.list({ calendarId: cal.id, timeMin: from, timeMax: to, q, singleEvents: true, orderBy: 'startTime', maxResults: q ? 50 : 250 }),
+        );
+        return (res.data.items ?? [])
+          .filter((e) => e.status !== 'cancelled')
+          .map((e) => ({
+            title: e.summary || '(sans titre)',
+            start: e.start?.dateTime ?? e.start?.date ?? '',
+            end: e.end?.dateTime ?? e.end?.date ?? '',
+            allDay: !e.start?.dateTime,
+            id: e.id ?? undefined,
+            location: e.location ?? null,
+            // Google keeps notes as light HTML: shown as plain text.
+            description: e.description ? (/<[a-z]/i.test(e.description) ? htmlToText(e.description) : e.description).slice(0, 4000) : null,
+            link: e.htmlLink ?? null,
+            calendar: { id: cal.id, name: cal.name, color: cal.color, primary: cal.primary },
+          }));
+      }),
+    );
+    return perCalendar.flat().sort((x, y) => x.start.localeCompare(y.start));
+  }
+
   return port;
 }
 
