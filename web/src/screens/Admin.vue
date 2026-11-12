@@ -5,6 +5,7 @@ import { api, post, when, type Category } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import BackupCard from '../components/BackupCard.vue';
 import IphoneCard from '../components/IphoneCard.vue';
+import LogoMark from '../components/LogoMark.vue';
 import NotificationsCard from '../components/NotificationsCard.vue';
 import PositionCard from '../components/PositionCard.vue';
 import BackgroundCard from '../components/BackgroundCard.vue';
@@ -287,5 +288,12 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
         </dl>
       </section>
     </div></div>
+    <footer class="admin-credit">
+      <span class="admin-credit-mark" aria-hidden="true"><LogoMark /></span>
+      <span>
+        <b>Calm {{ version }}</b><br />
+        <span class="muted">{{ t('admin.madeBy', { name: 'Damien Guesdon' }) }}</span>
+      </span>
+    </footer>
   </template>
 </template>
