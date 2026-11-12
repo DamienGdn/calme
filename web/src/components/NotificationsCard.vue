@@ -3,8 +3,9 @@ import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
 import { dateLocale } from '../i18n.ts';
-import { enablePush, pushSupported } from '../push.ts';
-import { notify, notifyError } from '../store.ts';
+import { badgeStatus, enablePush, pushSupported, testBadge } from '../push.ts';
+import { notify, notifyError, store } from '../store.ts';
+import { isUnread } from '../unread.ts';
 
 /** Phone notifications: what to push, quiet hours, subscribed devices (test / remove). */
 const props = defineProps<{ pushMode: 'all' | 'reply' | 'off'; quietStart: number | null; quietEnd: number | null }>();
@@ -12,7 +13,21 @@ const emit = defineEmits<{ save: [patch: Record<string, unknown>] }>();
 const { t } = useI18n();
 const devices = ref<{ endpoint: string; name: string; addedAt: number | null }[]>([]);
 const canPush = pushSupported() && !window.calmeDesktop;
+const isDesktop = Boolean(window.calmeDesktop);
 const hours = Array.from({ length: 24 }, (_, h) => h);
+
+const badge = ref(badgeStatus());
+async function tryBadge() {
+  const n = (store.state?.emails ?? []).filter(isUnread).length;
+  try {
+    await testBadge(n || 1);
+    notify(t('badge.tested', { n: n || 1 }));
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    badge.value = badgeStatus();
+  }
+}
 
 const load = () => api<typeof devices.value>('/api/push/devices').then((d) => (devices.value = d)).catch(() => {});
 onMounted(load);
@@ -77,5 +92,15 @@ const setQuiet = (on: boolean) => emit('save', on ? { quietStart: 22, quietEnd: 
     </div>
     <button v-if="canPush" type="button" class="btn" style="align-self: flex-start" @click="here">{{ t('admin.enableHere') }}</button>
     <p class="muted" style="margin: 0; font-size: 12px; line-height: 1.5; margin-top: auto">{{ t('admin.notifNote') }}</p>
+    <div v-if="!isDesktop" class="badge-check">
+      <span class="eyebrow">{{ t('badge.title') }}</span>
+      <ul>
+        <li :class="badge.homeScreen ? 'ok' : 'ko'">{{ badge.homeScreen ? t('badge.homeOk') : t('badge.homeKo') }}</li>
+        <li :class="badge.permission === 'granted' ? 'ok' : 'ko'">{{ badge.permission === 'granted' ? t('badge.permOk') : t('badge.permKo') }}</li>
+        <li :class="badge.supported ? 'ok' : 'ko'">{{ badge.supported ? t('badge.apiOk') : t('badge.apiKo') }}</li>
+      </ul>
+      <p class="muted" style="margin: 0; font-size: 13px; line-height: 1.5">{{ t('badge.note') }}</p>
+      <button type="button" class="btn" style="align-self: flex-start" @click="tryBadge">{{ t('badge.test') }}</button>
+    </div>
   </section>
 </template>

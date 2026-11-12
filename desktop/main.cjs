@@ -231,6 +231,12 @@ async function poll() {
     if (state.language && TEXT[state.language]) lang = state.language;
     const emails = state.emails || [];
     counts = { reply: state.counts?.reply ?? 0, total: emails.length };
+    // Unread mails on the Dock icon (macOS), like the badge on the iPhone home screen.
+    try {
+      app.setBadgeCount(emails.filter((m) => (m.labelIds || []).includes('UNREAD')).length);
+    } catch {
+      /* no badge on this system */
+    }
     // Wait for Calm's triage so the notification can say what the mail is about.
     const ready = emails.filter((m) => m.analysis);
     if (seen && Notification.isSupported() && settings.notify !== 'off') {

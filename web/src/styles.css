@@ -1128,3 +1128,8 @@ html.kb-open .fab { display: none; }
 @media (max-width: 720px) { .nl2-choice { width: 100%; } .nl2-choice button { flex: 1; padding: 0 6px; font-size: 12px; } }
 .mail-link { align-self: flex-start; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 15px; font-weight: 600; color: var(--accent-text); text-decoration: none; }
 .mail-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.badge-check { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; margin-top: 4px; border-top: 1px solid var(--line); }
+.badge-check ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.badge-check li::before { content: '●'; margin-right: 8px; font-size: 10px; vertical-align: 2px; }
+.badge-check li.ok::before { color: var(--accent-text); }
+.badge-check li.ko::before { color: var(--hot); }

@@ -106,7 +106,8 @@ export function createNotifier(
       const sub = s.listPushSubs().find((x) => x.endpoint === endpoint);
       if (!sub) return false;
       const en = getSettings(s, { model: '', intervalMin: 0 }).language === 'en';
-      await sender(sub, JSON.stringify({ title: 'Calm', body: en ? 'Notifications work on this device.' : 'Les notifications fonctionnent sur cet appareil.', url: '/' }));
+      const badge = s.listInbox().filter((m) => m.labelIds?.includes('UNREAD')).length;
+      await sender(sub, JSON.stringify({ title: 'Calm', body: en ? 'Notifications work on this device.' : 'Les notifications fonctionnent sur cet appareil.', url: '/', badge }));
       return true;
     },
   };
