@@ -13,6 +13,8 @@ export interface Reminder {
   id: string;
   text: string;
   due: number | null;
+  /** Also warn this many minutes before: 0, 60 or 1440. */
+  early: number;
   mailId: string | null;
   mailSubject: string | null;
   mailFrom: string | null;
@@ -35,6 +37,8 @@ export interface AppState {
   /** Signature added when sending ('' when off). */
   signature?: string;
   setupDone?: boolean;
+  /** Reminder alerts of the last day (server/src/notify.ts). */
+  alerts?: { id: string; title: string; body: string; url: string; at: number }[];
 }
 
 export interface CleanupView {

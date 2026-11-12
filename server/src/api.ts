@@ -18,7 +18,8 @@ import { draftQuestions, proposeSlots, readAgenda, redraft, suggestReminder, sug
 import { searchMail } from './search.ts';
 import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts';
 import type { Archive } from './archive.ts';
-import { openReminders } from './reminders.ts';
+import { EARLY, openReminders } from './reminders.ts';
+import { openLogos } from './logos.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
 
@@ -224,6 +225,7 @@ export function createApp(d: Deps) {
       setupDone: store.getMeta('setupDone') === '1',
       running: st.running,
       error: st.error,
+      alerts: d.notifier.alerts(),
     });
   });
 
@@ -509,6 +511,16 @@ export function createApp(d: Deps) {
 
   // Quick search, as you type: every word in the sender, subject or text, accents ignored; the inbox first-hand,
   // then the local base (older mail). No Claude, no Gmail call: instant.
+  // Logos of the senders' organisations (rows of the mail lists), fetched from their own sites and kept; none when the
+  // user turned remote images off (fetching them reaches the sender's site).
+  const logos = openLogos(store.db, d.fetchImpl);
+  app.post('/api/logos', async (c) => {
+    const { domains } = await c.req.json<{ domains?: unknown }>();
+    const list = Array.isArray(domains) ? domains.filter((x): x is string => typeof x === 'string' && x.length < 254) : [];
+    if (!getSettings(store, defaults()).remoteImages) return c.json(Object.fromEntries(list.map((x) => [x, null])));
+    return c.json(await logos.forDomains(list));
+  });
+
   app.get('/api/search/quick', (c) => {
     const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const q = (c.req.query('q') ?? '').slice(0, 200);
@@ -540,28 +552,35 @@ export function createApp(d: Deps) {
   // Reminders: things to do later, typed in or taken from a mail ("not now").
   const reminders = openReminders(store.db);
   const reminderText = (v: unknown) => (typeof v === 'string' && v.trim() && v.trim().length <= 300 ? v.trim() : null);
+  const reminderEarly = (v: unknown): number | undefined => (v === undefined ? 0 : EARLY.includes(v as number) ? (v as number) : undefined);
   const reminderDue = (v: unknown): number | null | undefined =>
     v === null || v === undefined ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined;
 
   app.get('/api/reminders', (c) => c.json(reminders.list()));
 
   app.post('/api/reminders', async (c) => {
-    const b = await c.req.json<{ text?: unknown; due?: unknown; mailId?: unknown }>();
+    const b = await c.req.json<{ text?: unknown; due?: unknown; mailId?: unknown; early?: unknown }>();
     const text = reminderText(b.text);
     const due = reminderDue(b.due);
-    if (!text || due === undefined) return c.json({ error: 'Texte (300 caractères max) et date valides attendus' }, 400);
+    const early = reminderEarly(b.early);
+    if (!text || due === undefined || early === undefined) return c.json({ error: 'Texte (300 caractères max), date et préavis valides attendus' }, 400);
     let mail: { id: string; subject: string; fromName: string } | undefined;
     if (b.mailId !== undefined) {
       const m = typeof b.mailId === 'string' ? store.getMail(b.mailId) : null;
       if (!m) return c.json({ error: 'Mail introuvable' }, 404);
       mail = { id: m.id, subject: m.subject, fromName: m.fromName };
     }
-    return c.json(reminders.add({ text, due, mail }));
+    return c.json(reminders.add({ text, due, early, mail }));
   });
 
   app.patch('/api/reminders/:id', async (c) => {
-    const b = await c.req.json<{ text?: unknown; due?: unknown; done?: unknown }>();
-    const patch: { text?: string; due?: number | null; done?: boolean } = {};
+    const b = await c.req.json<{ text?: unknown; due?: unknown; done?: unknown; early?: unknown }>();
+    const patch: { text?: string; due?: number | null; done?: boolean; early?: number } = {};
+    if (b.early !== undefined) {
+      const early = reminderEarly(b.early);
+      if (early === undefined) return c.json({ error: 'Préavis invalide' }, 400);
+      patch.early = early;
+    }
     if (b.text !== undefined) {
       const text = reminderText(b.text);
       if (!text) return c.json({ error: 'Texte invalide' }, 400);

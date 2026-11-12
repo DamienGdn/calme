@@ -222,6 +222,8 @@ const TEXT = {
 const tx = () => TEXT[lang] ?? TEXT.en;
 
 /** Notifies each new mail (skipping those Calm files under "À supprimer"); more than 3 at once are grouped. */
+/** Reminder alerts older than this were shown already (or before the app started, a few minutes of margin). */
+let lastAlertAt = Date.now() - 10 * 60_000;
 async function poll() {
   try {
     const state = await apiFetch('/api/state');
@@ -242,6 +244,16 @@ async function poll() {
         n.on('click', () => show(it.id ? `?mail=${encodeURIComponent(it.id)}#/tri` : '#/tri'));
         n.show();
       }
+    }
+    // Reminders that fell due (or warn ahead): one native notification each, opening the reminders.
+    if (Notification.isSupported()) {
+      for (const al of state.alerts || []) {
+        if (al.at <= lastAlertAt) continue;
+        const n = new Notification({ title: al.title, body: al.body, silent: false });
+        n.on('click', () => show('#/rappels'));
+        n.show();
+      }
+      lastAlertAt = Math.max(lastAlertAt, ...(state.alerts || []).map((al) => al.at));
     }
     seen = new Set([...(seen ?? []), ...ready.map((m) => m.id)]);
     lastError = null;

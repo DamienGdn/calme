@@ -25,6 +25,17 @@ describe('reminders', () => {
     expect(r.list()).toEqual([]);
   });
 
+  it('warns ahead when asked (a day or an hour before), then at the time', () => {
+    const r = fresh();
+    const a = r.add({ text: 'Compteur', due: 100_000_000, early: 1440 }, 1);
+    expect(r.soon(100_000_000 - 1440 * 60_000 - 1)).toEqual([]);
+    expect(r.soon(100_000_000 - 1440 * 60_000).map((x) => x.id)).toEqual([a.id]);
+    r.markNotified([a.id], 'early');
+    expect(r.soon(100_000_000 - 1000)).toEqual([]);
+    expect(r.due(100_000_000).map((x) => x.id)).toEqual([a.id]);
+    expect(r.add({ text: 'x', due: 5 }, 1).early).toBe(0);
+  });
+
   it('hands each due reminder to the notification once, and again after its date changes', () => {
     const r = fresh();
     const a = r.add({ text: 'due', due: 1000 }, 1);

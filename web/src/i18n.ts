@@ -297,6 +297,8 @@ const fr = {
     markOpen: 'Remettre « {text} » à faire',
     edit: 'Modifier le rappel',
     deleted: 'Rappel supprimé',
+    warn: 'Prévenir',
+    early: { m0: 'À l’heure', m60: '1 h avant aussi', m1440: 'La veille aussi' },
   },
   brief: {
     title: 'Lecture de Calm',
@@ -912,6 +914,8 @@ const en: Messages = {
     markOpen: 'Mark “{text}” as to do',
     edit: 'Edit reminder',
     deleted: 'Reminder deleted',
+    warn: 'Notify',
+    early: { m0: 'At the time', m60: 'Also 1 h before', m1440: 'Also the day before' },
   },
   brief: {
     title: 'Calm’s reading',

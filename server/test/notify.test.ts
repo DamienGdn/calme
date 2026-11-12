@@ -10,6 +10,26 @@ const reply = (id: string): Analysis => ({ id, category: 'reply', summary: [], a
 const vapid = { publicKey: 'pub', privateKey: 'priv' };
 
 describe('notifier', () => {
+  it('warns the day before a reminder, then at its time, and keeps the alerts for the apps', async () => {
+    const s = openStore(':memory:');
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    const r = openReminders(s.db);
+    const due = new Date(2026, 10, 13, 9).getTime();
+    r.add({ text: 'Compteur', due, early: 1440 }, 1);
+    const sent: { title: string; body: string }[] = [];
+    let now = new Date(2026, 10, 12, 9, 5);
+    const n = createNotifier(s, vapid, async (_s, p) => {
+      sent.push(JSON.parse(p));
+    }, () => now);
+    await n.notifyReminders(r);
+    now = new Date(2026, 10, 13, 9, 1);
+    await n.notifyReminders(r);
+    expect(sent.map((p) => p.body)).toEqual(['Compteur', 'Compteur']);
+    expect(sent[0].title).toMatch(/^Rappel · /);
+    expect(sent[1].title).toBe('Rappel');
+    expect(n.alerts().map((a) => a.title)).toEqual([sent[0].title, 'Rappel']);
+  });
+
   it('pushes each due reminder once, and waits out the quiet hours', async () => {
     const s = openStore(':memory:');
     s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });

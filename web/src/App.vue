@@ -112,7 +112,7 @@ watch(
 
 // Moving between pages: the tab screens stay alive (no reload, no blank flash, the bar does not move), and each
 // page comes back where it was scrolled; a new page starts at the top.
-const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders', 'Search'];
+const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders', 'Search', 'Reminders'];
 const scrolls = new Map<string, number>();
 watch(loc, (to, from) => {
   scrolls.set(`${from.route}/${from.arg}`, window.scrollY);
@@ -136,7 +136,7 @@ const tools: { r: Route; label: string; icon: IconName }[] = [
 ];
 const tabs: [Route, string, IconName][] = [
   ['tri', 'nav.mail', 'mail'],
-  ['menage', 'nav.cleanup', 'trash'],
+  ['rappels', 'nav.reminders', 'clock'],
   ['agenda', 'nav.agenda', 'calendar'],
   ['dossiers', 'nav.folders', 'folder'],
   ['recherche', 'nav.searchTab', 'search'],
@@ -277,7 +277,7 @@ const depth = (name: string) => name.split('/').length - 1;
           </span>
         </div>
         <a href="#/admin" class="appmenu-item"><Icon name="gear" :size="18" /> <span class="grow">{{ t('nav.settings') }}</span><span class="dot" :style="{ background: healthy ? 'var(--accent)' : 'var(--hot)' }" aria-hidden="true" /></a>
-        <a href="#/rappels" class="appmenu-item"><Icon name="clock" :size="18" /> <span class="grow">{{ t('nav.reminders') }}</span></a>
+        <a href="#/menage" class="appmenu-item"><Icon name="trash" :size="18" /> <span class="grow">{{ t('nav.cleanup') }}</span></a>
         <a href="#/desabonnements" class="appmenu-item"><Icon name="unsub" :size="18" /> <span class="grow">{{ t('nav.unsubscribe') }}</span></a>
         <a href="#/ecrire" class="appmenu-item" @click="draft = {}"><Icon name="pen" :size="18" /> <span class="grow">{{ t('nav.newMessage') }}</span></a>
         <span class="appmenu-version mono">Calm {{ version }}</span>

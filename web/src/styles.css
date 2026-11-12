@@ -1039,3 +1039,14 @@ html.kb-open .fab { display: none; }
   .appmenu-version { padding: 10px 10px 4px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); margin-top: 6px; }
 }
 @media (max-width: 720px) { [data-desktop='mac'] .appbar { padding-left: 84px; } }
+
+/* Sender at the start of a row: organisation logo (rounded square, like Apple Mail) or an initial; the category
+   as a small corner dot. */
+.row:has(.avatar) { grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 12px; }
+.avatar { grid-row: span 3; position: relative; width: 40px; height: 40px; margin-top: 2px; }
+.avatar img, .avatar-initial { width: 40px; height: 40px; border-radius: 11px; display: block; }
+.avatar img { object-fit: contain; background: #fff; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08); }
+.avatar-initial { display: grid; place-items: center; font-family: 'Fraunces', Georgia, serif; font-size: 19px; color: oklch(0.32 0.08 var(--h)); background: oklch(0.86 0.06 var(--h)); }
+[data-theme='dark'] .avatar-initial { color: oklch(0.9 0.06 var(--h)); background: oklch(0.36 0.07 var(--h)); }
+.avatar-tag { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 4px; border: 2px solid var(--bg); }
+.count-bubble { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--hot); color: #0d0e11; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; line-height: 1; }

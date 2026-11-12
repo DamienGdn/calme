@@ -4,13 +4,26 @@ import type { Reminders } from './reminders.ts';
 import type { Store } from './store.ts';
 import type { Analysis, PushSub } from './types.ts';
 
+export interface Alert {
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  at: number;
+}
+
 export type PushSender = (sub: PushSub, payload: string) => Promise<unknown>;
 
 export interface Notifier {
   /** Pushes newly sorted mails to subscribed phones, following the push mode and quiet hours. */
   notifyReplies(a: Analysis[]): Promise<void>;
-  /** Pushes reminders that fell due (once each), held back during quiet hours; none when notifications are off. */
+  /**
+   * Warns of reminders: ahead when asked (an hour, a day before), then at their time; once each, held back during
+   * quiet hours. Pushed to phones unless notifications are off, and kept as alerts for the apps (Mac, open pages).
+   */
   notifyReminders(r: Reminders): Promise<void>;
+  /** Reminder alerts of the last day, newest last: the Mac app and open pages show the ones they have not shown. */
+  alerts(): Alert[];
   test(endpoint: string): Promise<boolean>;
 }
 
@@ -64,11 +77,29 @@ export function createNotifier(
 
     async notifyReminders(r) {
       const st = getSettings(s, { model: '', intervalMin: 0 });
-      const due = r.due(now().getTime());
-      if (!due.length || inQuietHours(now().getHours(), st.quietStart, st.quietEnd)) return;
-      r.markNotified(due.map((x) => x.id));
-      if (st.pushMode === 'off') return;
-      await push(due.map((x) => ({ title: st.language === 'en' ? 'Reminder' : 'Rappel', body: x.text, url: '/#/rappels' })));
+      const t = now().getTime();
+      const early = r.soon(t);
+      const due = r.due(t);
+      if ((!early.length && !due.length) || inQuietHours(now().getHours(), st.quietStart, st.quietEnd)) return;
+      r.markNotified(early.map((x) => x.id), 'early');
+      r.markNotified(due.map((x) => x.id), 'due');
+      const en = st.language === 'en';
+      const word = en ? 'Reminder' : 'Rappel';
+      const fmt = new Intl.DateTimeFormat(en ? 'en-GB' : 'fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const payloads = [
+        ...early.map((x) => ({ title: `${word} · ${fmt.format(new Date(x.due!))}`, body: x.text, url: '/#/rappels' })),
+        ...due.map((x) => ({ title: word, body: x.text, url: '/#/rappels' })),
+      ];
+      const kept = this.alerts().filter((a) => t - a.at < 86400_000);
+      let n = 0;
+      for (const p of payloads) kept.push({ ...p, id: `${t}-${n++}`, at: t });
+      s.setMeta('alerts', JSON.stringify(kept.slice(-30)));
+      if (st.pushMode !== 'off') await push(payloads);
+    },
+
+    alerts() {
+      const list = JSON.parse(s.getMeta('alerts') ?? '[]') as Alert[];
+      return list.filter((a) => now().getTime() - a.at < 86400_000);
     },
 
     async test(endpoint) {

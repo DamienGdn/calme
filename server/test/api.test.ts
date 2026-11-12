@@ -70,7 +70,7 @@ function setup(gmailConnected = true) {
           }
         : { draft: 'Nouveau brouillon' },
     cfg,
-    notifier: { notifyReplies: async () => {}, notifyReminders: async () => {}, test: async () => true },
+    notifier: { notifyReplies: async () => {}, notifyReminders: async () => {}, alerts: () => [], test: async () => true },
     runCycle: async () => {},
     status: () => ({ running: false, error: null }),
     calendar: () => ({
@@ -103,6 +103,7 @@ function setup(gmailConnected = true) {
     claudeTest: async () => ({ ok: true, ms: 1200 }),
     fetchImpl: async (url, init) => {
       fetched.push({ url: String(url), init });
+      if (String(url) === 'https://shop.fr/apple-touch-icon.png') return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
       if (String(url).startsWith('https://data.geopf.fr/geocodage/search')) {
         if (String(url).includes('panne')) return new Response('{"message":"The upstream server is timing out"}', { status: 504 });
         return Response.json({
@@ -214,7 +215,8 @@ describe('api actions', () => {
     const { app } = setup();
     const json = (method: string, path: string, body?: unknown) =>
       app.request(path, { method, headers: { ...auth, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
-    const made = await (await json('POST', '/api/reminders', { text: '  Compteur de chantier ', due: 4102444800000, mailId: 'a' })).json();
+    const made = await (await json('POST', '/api/reminders', { text: '  Compteur de chantier ', due: 4102444800000, mailId: 'a', early: 1440 })).json();
+    expect(made.early).toBe(1440);
     expect(made).toMatchObject({ text: 'Compteur de chantier', due: 4102444800000, mailId: 'a', mailSubject: 'Sujet a', mailFrom: 'Sophie Martin', done: false });
     expect((await json('PATCH', `/api/reminders/${made.id}`, { done: true })).status).toBe(200);
     expect((await (await json('GET', '/api/reminders')).json())[0]).toMatchObject({ id: made.id, done: true });
@@ -228,6 +230,7 @@ describe('api actions', () => {
     expect((await send({ text: ' ' })).status).toBe(400);
     expect((await send({ text: 'x'.repeat(301) })).status).toBe(400);
     expect((await send({ text: 'ok', due: 'demain' })).status).toBe(400);
+    expect((await send({ text: 'ok', due: 5, early: 30 })).status).toBe(400);
     expect((await send({ text: 'ok', mailId: 'zzz' })).status).toBe(404);
     expect((await app.request('/api/reminders/zzz', { method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: '{"done":true}' })).status).toBe(404);
   });
@@ -262,6 +265,21 @@ describe('api actions', () => {
     const r = await q('COMPTEUR electricite');
     expect(r).toEqual([expect.objectContaining({ id: 'old1', source: 'local', subject: 'Devis électricité' })]);
     expect(await q(' ')).toEqual([]);
+  });
+
+  it('gives the logos of the senders’ organisations, fetched once from their own site', async () => {
+    const { app, fetched } = setup();
+    const ask = async (domains: unknown) =>
+      (await app.request('/api/logos', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ domains }) })).json();
+    const r = await ask(['news.shop.fr', 'gmail.com', 'localhost', '192.168.1.2']);
+    expect(r['news.shop.fr']).toBe('data:image/png;base64,iVBORw==');
+    expect(r['gmail.com']).toBeNull();
+    expect(r['localhost']).toBeNull();
+    expect(r['192.168.1.2']).toBeNull();
+    expect(fetched.every((f) => f.url.startsWith('https://shop.fr/'))).toBe(true);
+    const before = fetched.length;
+    await ask(['shop.fr']);
+    expect(fetched.length).toBe(before);
   });
 
   it('archives by removing the INBOX label', async () => {

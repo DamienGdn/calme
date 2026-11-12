@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { api, fullDate, post, useMailBody, when } from '../api.ts';
 import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
 import Icon from '../components/Icon.vue';
+import SenderAvatar from '../components/SenderAvatar.vue';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
 import { dateLocale } from '../i18n.ts';
@@ -223,7 +224,7 @@ onDeactivated(() => window.removeEventListener('popstate', onPop));
     <div :class="['split', { reading: open }]">
       <section class="list" :aria-label="t('search.found')">
         <button v-for="r in listed" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="read(r)">
-          <span class="mark" :style="{ background: r.relevant ? 'var(--accent)' : 'var(--line)' }" aria-hidden="true" />
+          <SenderAvatar :name="r.fromName" :email="r.fromEmail" :tag="r.relevant ? 'var(--accent)' : undefined" />
           <span class="from">{{ r.fromName }}</span>
           <span class="time">{{ when(r.date) }}</span>
           <span class="subj">{{ r.subject || t('common.noSubject') }}</span>

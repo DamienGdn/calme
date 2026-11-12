@@ -17,6 +17,8 @@ const { t } = useI18n();
 
 const text = ref(props.reminder?.text ?? '');
 const due = ref<number | null>(props.reminder?.due ?? null);
+const early = ref<number>(props.reminder?.early ?? 0);
+const EARLY = [0, 60, 1440] as const;
 const thinking = ref(false);
 const saving = ref(false);
 const typed = ref(false);
@@ -59,8 +61,8 @@ async function save() {
   if (!text.value.trim() || saving.value) return;
   saving.value = true;
   try {
-    if (props.reminder) await api(`/api/reminders/${encodeURIComponent(props.reminder.id)}`, { method: 'PATCH', body: JSON.stringify({ text: text.value, due: due.value }) });
-    else await post('/api/reminders', { text: text.value, due: due.value, mailId: props.mailId });
+    if (props.reminder) await api(`/api/reminders/${encodeURIComponent(props.reminder.id)}`, { method: 'PATCH', body: JSON.stringify({ text: text.value, due: due.value, early: due.value === null ? 0 : early.value }) });
+    else await post('/api/reminders', { text: text.value, due: due.value, early: due.value === null ? 0 : early.value, mailId: props.mailId });
     store.remindersVersion++;
     notify(t('remind.saved'), false, props.reminder ? undefined : { label: t('remind.see'), run: () => goTo('rappels') });
     emit('close');
@@ -117,6 +119,13 @@ async function remove() {
           @change="due = ($event.target as HTMLInputElement).value ? new Date(($event.target as HTMLInputElement).value).getTime() : null"
         />
         <p v-if="dueText" class="muted remind-due">{{ dueText }}</p>
+      </fieldset>
+
+      <fieldset v-if="due !== null" class="remind-when">
+        <legend class="eyebrow">{{ t('remind.warn') }}</legend>
+        <div class="tones" role="radiogroup" :aria-label="t('remind.warn')" style="align-self: flex-start">
+          <button v-for="e in EARLY" :key="e" type="button" role="radio" :aria-checked="early === e" @click="early = e">{{ t(`remind.early.m${e}`) }}</button>
+        </div>
       </fieldset>
 
       <div class="remind-foot">

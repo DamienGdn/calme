@@ -3,6 +3,7 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue
 import { useI18n } from 'vue-i18n';
 import { CAT_CLASS, CAT_COLOR, post, when, type Category, type MailItem } from '../api.ts';
 import Icon from '../components/Icon.vue';
+import SenderAvatar from '../components/SenderAvatar.vue';
 import SwipeRow from '../components/SwipeRow.vue';
 import TabBar from '../components/TabBar.vue';
 import { axis, swipeBack } from '../gestures.ts';
@@ -56,6 +57,8 @@ watch(emails, (list) => {
 });
 const counts = computed(() => store.state?.counts ?? { reply: 0, read: 0, news: 0, trash: 0 });
 const total = computed(() => ORDER.reduce((n, k) => n + counts.value[k], 0));
+/** Mails the clean-up would deal with (to delete, newsletters): shown on its button. */
+const cleanable = computed(() => counts.value.trash + counts.value.news);
 const setFilter = (f: Category | 'all') => goTo('tri', f === 'all' ? '' : f);
 
 const meta = computed(() => {
@@ -313,6 +316,7 @@ function askCalme() {
         <span class="sr">{{ t('triage.searchLabel') }}</span>
         <input v-model="query" type="search" :placeholder="t('triage.filterPlaceholder')" @keydown.enter="askCalme" />
       </label>
+      <a href="#/menage" class="btn" :aria-label="t('nav.cleanup')" :title="t('nav.cleanup')"><Icon name="trash" :size="16" /> <span class="wide-only">{{ t('nav.cleanup') }}</span><span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
       <button v-if="!pushOn && canPush" type="button" class="btn" :aria-label="t('triage.enablePush')" @click="turnOnPush"><Icon name="bell" :size="16" /> <span class="wide-only">{{ t('triage.enablePush') }}</span></button>
       <button type="button" class="btn btn-prim" :disabled="store.state?.running" :aria-label="t('common.sync')" @click="sync">
         <Icon name="refresh" :size="16" /> <span class="wide-only">{{ store.state?.running ? t('common.syncing') : t('common.sync') }}</span>
@@ -391,7 +395,7 @@ function askCalme() {
           @auxclick="$event.button === 1 && select(m, true)"
         >
           <span v-if="selecting" class="pick" aria-hidden="true"><Icon v-if="selected.has(m.id)" name="check" :size="12" /></span>
-          <span v-else class="mark" :style="{ background: m.analysis ? CAT_COLOR[m.analysis.category] : 'var(--line)' }" aria-hidden="true" />
+          <SenderAvatar v-else :name="m.fromName" :email="m.fromEmail" :tag="m.analysis ? CAT_COLOR[m.analysis.category] : undefined" />
           <span class="from">{{ m.fromName }}</span>
           <span class="time"><i v-if="isUnread(m)" class="udot" /><span v-if="isUnread(m)" class="sr">{{ t('triage.unread') }}, </span>{{ when(m.date) }}</span>
           <span class="subj">{{ m.subject || t('common.noSubject') }}</span>

@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue';
 import { api, getToken, post, setToken, Unauthorized, type AppState } from './api.ts';
 import { canRefract } from './glass.ts';
+import { i18n } from './i18n.ts';
 import { isUnread, withUnread } from './unread.ts';
 
 /**
@@ -81,6 +82,7 @@ export async function refresh() {
   try {
     store.state = await api<AppState>('/api/state');
     showBadge(store.state.emails.filter(isUnread).length);
+    showAlerts(store.state.alerts ?? []);
   } catch (e) {
     if (e instanceof Unauthorized) {
       setToken(null);
@@ -104,6 +106,26 @@ export async function setRead(ids: string[], read: boolean) {
     for (const m of mails) m.labelIds = before.get(m.id) ?? m.labelIds;
     notifyError(e);
   }
+}
+
+/** Reminder alerts not shown on this device yet: a toast that leads to the reminders. */
+const ALERT_KEY = 'calme.alertSeen';
+function showAlerts(list: { id: string; title: string; body: string; at: number }[]) {
+  let seen = 0;
+  try {
+    seen = Number(localStorage.getItem(ALERT_KEY) ?? 0);
+  } catch {
+    /* not kept: show the latest */
+  }
+  const fresh = list.filter((a) => a.at > seen);
+  if (!fresh.length) return;
+  const last = fresh[fresh.length - 1];
+  try {
+    localStorage.setItem(ALERT_KEY, String(last.at));
+  } catch {
+    /* not kept */
+  }
+  notify(`${last.title} — ${last.body}${fresh.length > 1 ? ` (+${fresh.length - 1})` : ''}`, false, { label: i18n.global.t('remind.see'), run: () => goTo('rappels') });
 }
 
 /** Unread mails on the app icon (home-screen app; ignored where the Badging API is missing). */
