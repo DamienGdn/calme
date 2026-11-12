@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { dateLocale } from '../i18n.ts';
 import { post } from '../api.ts';
 import { directionsUrl, mapsUrl } from '../maps.ts';
-import { currentPosition, positionAllowed } from '../position.ts';
+import { currentPosition, here, positionState } from '../position.ts';
 import { useSheetDrag } from '../sheetDrag.ts';
 import Icon from './Icon.vue';
 
@@ -75,9 +75,9 @@ async function whenToLeave() {
 }
 
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
-onMounted(async () => {
+onMounted(() => {
   window.addEventListener('keydown', onKey);
-  if (canLeave.value && (await positionAllowed())) void whenToLeave();
+  if (canLeave.value && (here.value || positionState.value === 'granted')) void whenToLeave();
 });
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 </script>

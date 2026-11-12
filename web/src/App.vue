@@ -10,6 +10,7 @@ import Icon, { type IconName } from './components/Icon.vue';
 import PairRequests from './components/PairRequests.vue';
 import QuotaGauge from './components/QuotaGauge.vue';
 import { setLang } from './i18n.ts';
+import { initPosition } from './position.ts';
 import { registerWorker } from './push.ts';
 import Admin from './screens/Admin.vue';
 import Agenda from './screens/Agenda.vue';
@@ -67,6 +68,7 @@ onMounted(() => {
   window.addEventListener('keydown', onMenuKey);
   window.addEventListener('resize', placePill);
   void registerWorker();
+  void initPosition();
 });
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', onHash);

@@ -5,7 +5,6 @@ import { api, post } from '../api.ts';
 import { dateLocale } from '../i18n.ts';
 import { badgeStatus, enablePush, pushSupported, testBadge } from '../push.ts';
 import { notify, notifyError, store } from '../store.ts';
-import { isUnread } from '../unread.ts';
 
 /** Phone notifications: what to push, quiet hours, subscribed devices (test / remove). */
 const props = defineProps<{ pushMode: 'all' | 'reply' | 'off'; quietStart: number | null; quietEnd: number | null }>();
@@ -18,7 +17,7 @@ const hours = Array.from({ length: 24 }, (_, h) => h);
 
 const badge = ref(badgeStatus());
 async function tryBadge() {
-  const n = (store.state?.emails ?? []).filter(isUnread).length;
+  const n = store.state?.counts.reply ?? 0;
   let result = 'ok';
   try {
     await testBadge(n || 1);

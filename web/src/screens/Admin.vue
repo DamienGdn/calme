@@ -6,6 +6,7 @@ import Icon from '../components/Icon.vue';
 import BackupCard from '../components/BackupCard.vue';
 import IphoneCard from '../components/IphoneCard.vue';
 import NotificationsCard from '../components/NotificationsCard.vue';
+import PositionCard from '../components/PositionCard.vue';
 import SignatureCard from '../components/SignatureCard.vue';
 import CalendarsCard from '../components/CalendarsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
@@ -265,6 +266,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
       <SignatureCard :signature="v.settings.signature" :on="v.settings.signatureOn" @save="save" />
       <BackupCard :local="local" />
       <NotificationsCard :push-mode="v.settings.pushMode" :quiet-start="v.settings.quietStart" :quiet-end="v.settings.quietEnd" @save="save" />
+      <PositionCard />
       <IphoneCard :local="local" :ai-ok="v.claude.installed" />
 
       <section class="card" aria-labelledby="a-data">

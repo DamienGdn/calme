@@ -279,6 +279,15 @@ const fr = {
     done: '{unsub} désabonnement(s){trash}',
     doneTrash: ' · {n} mails à la corbeille',
   },
+  position: {
+    title: 'Position',
+    lead: 'Calm suit ta position tant que l’app est ouverte, pour dire aussitôt quand partir à un rendez-vous.',
+    allow: 'Autoriser la position',
+    on: 'Position active · mise à jour à {time}',
+    denied: 'Position refusée. Sur iPhone : Réglages › Confidentialité › Service de localisation › Safari (sites web) › « Lorsque l’app est active », puis rouvre Calm.',
+    unsupported: 'Cet appareil ne donne pas sa position à Calm.',
+    note: 'Gardée en mémoire seulement, jamais enregistrée : elle sert à calculer l’itinéraire (IGN). Une app web n’a pas la position en arrière-plan : sur iPhone, elle se met à jour quand tu ouvres Calm.',
+  },
   install: {
     title: 'Installer Calm',
     ios1: 'Dans Safari, touche le bouton Partager (en bas, ou en haut sur iPad).',
@@ -987,6 +996,15 @@ const en: Messages = {
     go: 'Unsubscribe ({n})',
     done: '{unsub} unsubscription(s){trash}',
     doneTrash: ' · {n} mails in the trash',
+  },
+  position: {
+    title: 'Location',
+    lead: 'Calm follows your location while the app is open, to tell at once when to leave for an appointment.',
+    allow: 'Allow location',
+    on: 'Location on · updated at {time}',
+    denied: 'Location denied. On iPhone: Settings › Privacy › Location Services › Safari Websites › “While Using the App”, then reopen Calm.',
+    unsupported: 'This device does not give its location to Calm.',
+    note: 'Kept in memory only, never stored: it is used to compute the route (IGN). A web app gets no location in the background: on iPhone it updates when you open Calm.',
   },
   install: {
     title: 'Install Calm',
