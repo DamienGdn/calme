@@ -104,8 +104,24 @@ function setup(gmailConnected = true) {
     fetchImpl: async (url, init) => {
       fetched.push({ url: String(url), init });
       if (String(url) === 'https://shop.fr/apple-touch-icon.png') return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
+      if (String(url).startsWith('https://photon.komoot.io/api')) {
+        if (String(url).includes('panne') || String(url).includes('bancal')) return new Response('down', { status: 503 });
+        const poi = (name: string, key: string, value: string, street: string, city: string, postcode: string, country = 'FR') => ({
+          geometry: { type: 'Point', coordinates: [-1.63, 48.16] },
+          properties: { name, osm_key: key, osm_value: value, street, city, postcode, county: 'Ille-et-Vilaine', countrycode: country },
+        });
+        return Response.json({
+          type: 'FeatureCollection',
+          features: [
+            poi('Leroy Merlin', 'shop', 'doityourself', 'Rue de la Maison Neuve', 'Betton', '35830'),
+            poi('Leroy Merlin', 'shop', 'doityourself', 'Calle Mayor', 'Madrid', '28013', 'ES'),
+            poi('Rue de Rivoli', 'highway', 'residential', '', 'Paris', '75001'),
+            poi('Pharmacie du Centre', 'amenity', 'pharmacy', '', 'Rennes', '35000'),
+          ],
+        });
+      }
       if (String(url).startsWith('https://data.geopf.fr/geocodage/search')) {
-        if (String(url).includes('panne')) return new Response('{"message":"The upstream server is timing out"}', { status: 504 });
+        if (String(url).includes('panne') || String(url).includes('ign-ko')) return new Response('{"message":"The upstream server is timing out"}', { status: 504 });
         return Response.json({
           type: 'FeatureCollection',
           features: [
@@ -890,21 +906,46 @@ describe('address search (Géoplateforme)', () => {
   it('suggests French addresses as you type', async () => {
     const { app, fetched } = setup();
     const r = await (await app.request('/api/address?q=10%20rue%20de%20rivoli', { headers: auth })).json();
-    expect(r[0]).toEqual({ label: '10 Rue de Rivoli 75004 Paris', name: '10 Rue de Rivoli', postcode: '75004', city: 'Paris', context: '75, Paris, Île-de-France', lat: 48.8617, lon: 2.3367 });
-    expect(r).toHaveLength(2);
-    const url = new URL(fetched.at(-1)!.url);
+    expect(r[0]).toEqual({ kind: 'address', label: '10 Rue de Rivoli 75004 Paris', name: '10 Rue de Rivoli', postcode: '75004', city: 'Paris', context: '75, Paris, Île-de-France', lat: 48.8617, lon: 2.3367 });
+    const url = new URL(fetched.find((f) => f.url.includes('geopf'))!.url);
     expect(url.origin + url.pathname).toBe('https://data.geopf.fr/geocodage/search');
     expect(url.searchParams.get('q')).toBe('10 rue de rivoli');
     expect(url.searchParams.get('autocomplete')).toBe('1');
   });
 
+  it('finds a shop by its name, before the addresses, with its full address', async () => {
+    const { app, fetched } = setup();
+    const r = await (await app.request('/api/address?q=leroy%20merlin', { headers: auth })).json();
+    expect(r[0]).toEqual({ kind: 'place', label: 'Leroy Merlin, Rue de la Maison Neuve, 35830 Betton', name: 'Leroy Merlin', postcode: '35830', city: 'Betton', context: 'Betton, Ille-et-Vilaine', lat: 48.16, lon: -1.63 });
+    expect(r[1]).toMatchObject({ kind: 'place', label: 'Pharmacie du Centre, 35000 Rennes' });
+    expect(r.filter((a: { kind: string }) => a.kind === 'place')).toHaveLength(2); // abroad and streets left out
+    expect(r[2]).toMatchObject({ kind: 'address', label: '10 Rue de Rivoli 75004 Paris' });
+    const photon = new URL(fetched.find((f) => f.url.startsWith('https://photon.komoot.io'))!.url);
+    expect(photon.searchParams.get('q')).toBe('leroy merlin');
+    expect(photon.searchParams.get('lang')).toBe('fr');
+  });
+
+  it('puts the addresses first when the query starts with a number', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/address?q=10%20rue%20de%20rivoli', { headers: auth })).json();
+    expect(r.map((a: { kind: string }) => a.kind)).toEqual(['address', 'address', 'place', 'place']);
+  });
+
+  it('keeps what one service found when the other is down', async () => {
+    const { app } = setup();
+    const shops = await (await app.request('/api/address?q=leroy%20ign-ko', { headers: auth })).json();
+    expect(shops.map((a: { kind: string }) => a.kind)).toEqual(['place', 'place']);
+    const addresses = await (await app.request('/api/address?q=rue%20bancal', { headers: auth })).json();
+    expect(addresses.map((a: { kind: string }) => a.kind)).toEqual(['address', 'address']);
+  });
+
   it('asks nothing for less than 3 characters', async () => {
     const { app, fetched } = setup();
     expect(await (await app.request('/api/address?q=ri', { headers: auth })).json()).toEqual([]);
-    expect(fetched.some((f) => f.url.includes('geopf'))).toBe(false);
+    expect(fetched.some((f) => f.url.includes('geopf') || f.url.includes('photon'))).toBe(false);
   });
 
-  it('says so when the service is down, so the address can be typed by hand', async () => {
+  it('says so when both services are down, so the address can be typed by hand', async () => {
     const { app } = setup();
     expect((await app.request('/api/address?q=rue%20en%20panne', { headers: auth })).status).toBe(502);
   });

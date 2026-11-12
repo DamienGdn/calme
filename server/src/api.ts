@@ -21,6 +21,7 @@ import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts'
 import type { Archive } from './archive.ts';
 import { EARLY, openReminders } from './reminders.ts';
 import { openLogos } from './logos.ts';
+import { searchPlaces } from './places.ts';
 import { openUsage } from './usage.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
@@ -804,23 +805,8 @@ export function createApp(d: Deps) {
   app.get('/api/address', async (c) => {
     const q = (c.req.query('q') ?? '').trim().slice(0, 200);
     if (q.length < 3) return c.json([]);
-    const url = `https://data.geopf.fr/geocodage/search?${new URLSearchParams({ q, limit: '6', autocomplete: '1', index: 'address' })}`;
     try {
-      const res = await (d.fetchImpl ?? fetch)(url, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      type Feature = { geometry?: { coordinates?: [number, number] }; properties?: Record<string, unknown> };
-      const j = (await res.json()) as { features?: Feature[] };
-      return c.json(
-        (j.features ?? []).slice(0, 6).map((f) => ({
-          label: String(f.properties?.label ?? ''),
-          name: String(f.properties?.name ?? ''),
-          postcode: String(f.properties?.postcode ?? ''),
-          city: String(f.properties?.city ?? ''),
-          context: String(f.properties?.context ?? ''),
-          lat: Number(f.geometry?.coordinates?.[1]),
-          lon: Number(f.geometry?.coordinates?.[0]),
-        })),
-      );
+      return c.json(await searchPlaces(q, d.fetchImpl ?? fetch));
     } catch {
       return c.json({ error: 'Recherche d’adresse indisponible : saisis l’adresse à la main.' }, 502);
     }

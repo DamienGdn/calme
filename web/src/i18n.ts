@@ -412,8 +412,8 @@ const fr = {
     form: {
       title: 'Titre', titlePh: 'Rendez-vous, dîner, garage…', date: 'Date', start: 'Début', end: 'Fin', place: 'Lieu (facultatif)', submit: 'Ajouter à mon agenda', adding: 'Ajout…',
       add: 'Ajouter', when: 'Quand', startDay: 'Jour de début', startTime: 'Heure de début', endDay: 'Jour de fin', endTime: 'Heure de fin',
-      endBefore: 'La fin doit être après le début.', placeLabel: 'Lieu', placePh: 'Adresse, ville ou lieu…', addrDown: 'Recherche d’adresse indisponible : saisis l’adresse à la main.',
-      seeMap: 'Voir sur la carte', addrSource: 'Adresses : Base Adresse Nationale (IGN)', reminder: 'Rappel', calendar: 'Agenda',
+      endBefore: 'La fin doit être après le début.', placeLabel: 'Lieu', placePh: 'Adresse, ville ou enseigne…', addrDown: 'Recherche d’adresse indisponible : saisis l’adresse à la main.',
+      seeMap: 'Voir sur la carte', addrSource: 'Adresses : Base Adresse Nationale (IGN) · Enseignes et lieux : © contributeurs OpenStreetMap', reminder: 'Rappel', calendar: 'Agenda',
       save: 'Enregistrer',
       reminders: { keep: 'Inchangé', none: 'Aucun', 10: '10 min avant', 30: '30 min avant', 60: '1 h avant', 1440: 'La veille' },
       notes: 'Notes', notesPh: 'Code d’entrée, documents à apporter…',
@@ -1099,8 +1099,8 @@ const en: Messages = {
     form: {
       title: 'Title', titlePh: 'Appointment, dinner, garage…', date: 'Date', start: 'Start', end: 'End', place: 'Place (optional)', submit: 'Add to my calendar', adding: 'Adding…',
       add: 'Add', when: 'When', startDay: 'Start day', startTime: 'Start time', endDay: 'End day', endTime: 'End time',
-      endBefore: 'The end must be after the start.', placeLabel: 'Place', placePh: 'Address, town or place…', addrDown: 'Address search unavailable: type the address by hand.',
-      seeMap: 'See on the map', addrSource: 'Addresses: French national address base (IGN)', reminder: 'Reminder', calendar: 'Calendar',
+      endBefore: 'The end must be after the start.', placeLabel: 'Place', placePh: 'Address, town or shop…', addrDown: 'Address search unavailable: type the address by hand.',
+      seeMap: 'See on the map', addrSource: 'Addresses: French national address base (IGN) · Shops and places: © OpenStreetMap contributors', reminder: 'Reminder', calendar: 'Calendar',
       save: 'Save',
       reminders: { keep: 'Unchanged', none: 'None', 10: '10 min before', 30: '30 min before', 60: '1 h before', 1440: 'The day before' },
       notes: 'Notes', notesPh: 'Door code, documents to bring…',

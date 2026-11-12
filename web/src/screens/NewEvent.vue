@@ -100,8 +100,8 @@ async function submit() {
   }
 }
 
-// --- Place: suggestions from the French address base as you type.
-interface Address { label: string; context: string; lat: number; lon: number }
+// --- Place: as you type, named places (a shop, a chain, a pharmacy…, from OpenStreetMap) and French addresses.
+interface Address { kind: 'address' | 'place'; label: string; context: string; lat: number; lon: number }
 const suggestions = ref<Address[]>([]);
 const active = ref(-1);
 const addrError = ref('');
@@ -211,7 +211,9 @@ onBeforeUnmount(() => {
           />
           <ul v-if="suggestions.length" id="ev-addr" class="addr-list" role="listbox">
             <li v-for="(a, i) in suggestions" :key="a.label + i" role="option" :aria-selected="i === active">
-              <button type="button" @click="pick(a)"><strong>{{ a.label }}</strong><span>{{ a.context }}</span></button>
+              <button type="button" @click="pick(a)">
+                <strong><Icon :name="a.kind === 'place' ? 'store' : 'pin'" :size="13" /> {{ a.label }}</strong><span>{{ a.context }}</span>
+              </button>
             </li>
           </ul>
           <p v-if="addrError" class="ev-warn">{{ addrError }}</p>
