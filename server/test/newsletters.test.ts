@@ -30,10 +30,18 @@ describe('settings', () => {
     const s = openStore(':memory:');
     expect(getSettings(s, { model: 'sonnet', intervalMin: 5 })).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, hiddenCalendars: [], model: 'sonnet', intervalMin: 5 });
   });
+  it('accepts a 30-second and a 1-minute check', () => {
+    const s = openStore(':memory:');
+    saveSettings(s, { intervalMin: 0.5 });
+    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 }).intervalMin).toBe(0.5);
+    saveSettings(s, { intervalMin: 1 });
+    expect(getSettings(s, { model: 'sonnet', intervalMin: 5 }).intervalMin).toBe(1);
+  });
   it('rejects invalid values', () => {
     const s = openStore(':memory:');
     expect(() => saveSettings(s, { model: 'gpt' as never })).toThrow();
     expect(() => saveSettings(s, { intervalMin: 0 })).toThrow();
+    expect(() => saveSettings(s, { intervalMin: 0.7 })).toThrow();
     expect(() => saveSettings(s, { archiveMonths: 5 })).toThrow();
     expect(() => saveSettings(s, { language: 'de' as never })).toThrow();
     expect(() => saveSettings(s, { pushMode: 'loud' as never })).toThrow();

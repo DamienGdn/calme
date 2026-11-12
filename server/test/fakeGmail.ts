@@ -39,12 +39,12 @@ export function rawMessage(id: string, extraHeaders: Record<string, string> = {}
 
 export function fakeGmail(ids: string[] = []) {
   const calls: { method: string; args: unknown[] }[] = [];
-  const state = { ids: [...ids], pages: {} as Record<string, { ids: string[]; next?: string }> };
+  const state = { ids: [...ids], unread: [] as string[], pages: {} as Record<string, { ids: string[]; next?: string }> };
   const record = (method: string, ...args: unknown[]) => calls.push({ method, args });
   const port: GmailPort = {
     async listInboxIds(q, max) {
       record('listInboxIds', q, max);
-      return state.ids;
+      return q.includes('is:unread') ? state.unread : state.ids;
     },
     async listPage(q, pageToken) {
       record('listPage', q, pageToken);

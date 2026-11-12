@@ -44,8 +44,9 @@ export function saveSettings(s: Store, patch: Partial<Settings>): void {
     next.model = patch.model;
   }
   if (patch.intervalMin !== undefined) {
-    if (!Number.isInteger(patch.intervalMin) || patch.intervalMin < 1 || patch.intervalMin > 1440)
-      throw new Error('Intervalle entre 1 et 1440 minutes');
+    // 0.5 = every 30 seconds; otherwise whole minutes.
+    const n = patch.intervalMin;
+    if (n !== 0.5 && (!Number.isInteger(n) || n < 1 || n > 1440)) throw new Error('Intervalle : 30 s, ou entre 1 et 1440 minutes');
     next.intervalMin = patch.intervalMin;
   }
   if (patch.archiveMonths !== undefined) {

@@ -2,7 +2,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
-import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, trash, unsubscribe, untrash } from './actions.ts';
+import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, setRead, trash, unsubscribe, untrash } from './actions.ts';
 import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, type CalendarPort, type NewEvent } from './calendar.ts';
 import type { ClaudeRunner } from './claude.ts';
 import type { Config } from './config.ts';
@@ -365,6 +365,15 @@ export function createApp(d: Deps) {
     const id = c.req.param('id');
     if (!store.getMail(id)?.analysis) return c.json({ error: 'Mail introuvable' }, 404);
     store.setCategory(id, category as Category);
+    return c.json({ ok: true });
+  });
+
+  // Read state: opening a mail marks it read; "Mark unread" from the mail, a selection or a swipe.
+  app.post('/api/mails/read', async (c) => {
+    const { ids, read } = await c.req.json<{ ids?: unknown; read?: unknown }>();
+    if (!Array.isArray(ids) || !ids.length || ids.length > 500 || !ids.every((x) => typeof x === 'string') || typeof read !== 'boolean')
+      return c.json({ error: 'ids et read attendus' }, 400);
+    await setRead(gmail(), store, ids as string[], read);
     return c.json({ ok: true });
   });
 

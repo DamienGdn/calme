@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, CAT_COLOR, type Category } from './api.ts';
 import Icon, { type IconName } from './components/Icon.vue';
@@ -101,6 +101,15 @@ watch(
   },
 );
 
+// Moving between pages: the tab screens stay alive (no reload, no blank flash, the bar does not move), and each
+// page comes back where it was scrolled; a new page starts at the top.
+const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders'];
+const scrolls = new Map<string, number>();
+watch(loc, (to, from) => {
+  scrolls.set(`${from.route}/${from.arg}`, window.scrollY);
+  void nextTick(() => window.scrollTo({ top: scrolls.get(`${to.route}/${to.arg}`) ?? 0 }));
+});
+
 const route = computed<Route>(() => loc.value.route);
 const filter = computed(() => (route.value === 'tri' && (FILTERS as string[]).includes(loc.value.arg) ? (loc.value.arg as Category | 'all') : 'all'));
 const counts = computed(() => store.state?.counts ?? { reply: 0, read: 0, news: 0, trash: 0 });
@@ -180,6 +189,7 @@ const depth = (name: string) => name.split('/').length - 1;
     </aside>
 
     <main class="main">
+      <KeepAlive :include="KEPT">
       <Triage v-if="route === 'tri'" :filter="filter" />
       <Editor v-else-if="route === 'ecrire'" :key="draft.mailId ?? 'new'" />
       <Cleanup v-else-if="route === 'menage'" />
@@ -188,6 +198,7 @@ const depth = (name: string) => name.split('/').length - 1;
       <Folders v-else-if="route === 'dossiers'" :label-id="loc.arg" />
       <Admin v-else-if="route === 'admin'" />
       <Search v-else-if="route === 'recherche'" :initial="loc.arg" />
+      </KeepAlive>
     </main>
 
     <button v-if="['tri', 'dossiers', 'recherche'].includes(route)" type="button" class="fab" @click="openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>

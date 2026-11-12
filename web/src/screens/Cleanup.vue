@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onActivated, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post, type CleanupView } from '../api.ts';
 import Icon from '../components/Icon.vue';
@@ -24,7 +24,8 @@ async function load() {
     notifyError(e);
   }
 }
-onMounted(load);
+// Kept alive between tabs (App.vue): fresh data each time the screen comes back.
+onActivated(load);
 
 const toggle = (set: Set<string>, v: string) => (set.has(v) ? set.delete(v) : set.add(v));
 const groups = computed(() => view.value?.groups ?? []);

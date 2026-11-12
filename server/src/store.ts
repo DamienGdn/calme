@@ -88,6 +88,27 @@ export function openStore(path: string) {
       return r ? toView(r) : null;
     },
 
+    /** Read state, kept like Gmail does: a mail is unread while it carries the UNREAD label. */
+    setUnread(ids: string[], unread: boolean): void {
+      const get = db.prepare('SELECT data FROM messages WHERE id = ?');
+      const put = db.prepare('UPDATE messages SET data = ? WHERE id = ?');
+      for (const id of ids) {
+        const r = get.get(id) as { data: string } | undefined;
+        if (!r) continue;
+        const m = JSON.parse(r.data) as MailMessage;
+        const labels = (m.labelIds ?? []).filter((l) => l !== 'UNREAD');
+        if (unread) labels.push('UNREAD');
+        if (labels.join() !== (m.labelIds ?? []).join()) put.run(JSON.stringify({ ...m, labelIds: labels }), id);
+      }
+    },
+
+    /** Follows the read state seen in Gmail (read on the phone, in Gmail…): `unread` holds the inbox's unread ids. */
+    syncUnread(unread: Set<string>): void {
+      const ids = this.inboxIds();
+      this.setUnread(ids.filter((id) => unread.has(id)), true);
+      this.setUnread(ids.filter((id) => !unread.has(id)), false);
+    },
+
     restoreToInbox(ids: string[]): void {
       const st = db.prepare('UPDATE messages SET in_inbox = 1 WHERE id = ?');
       for (const id of ids) st.run(id);

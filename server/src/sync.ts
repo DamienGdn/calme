@@ -4,6 +4,7 @@ import type { Store } from './store.ts';
 
 export const INBOX_QUERY = 'in:inbox newer_than:30d';
 export const INBOX_MAX = 200;
+export const UNREAD_QUERY = 'in:inbox is:unread newer_than:30d';
 
 export async function syncInbox(g: GmailPort, s: Store): Promise<{ added: number }> {
   const remote = await g.listInboxIds(INBOX_QUERY, INBOX_MAX);
@@ -15,6 +16,8 @@ export async function syncInbox(g: GmailPort, s: Store): Promise<{ added: number
   const fresh = [];
   for (const id of remote) if (!known.has(id)) fresh.push(parseGmailMessage(await g.get(id)));
   const added = s.upsertMessages(fresh);
+  // Mails read (or marked unread) elsewhere since they were fetched: one more listing keeps Calm in step.
+  s.syncUnread(new Set(await g.listInboxIds(UNREAD_QUERY, INBOX_MAX)));
   s.setMeta('lastSync', String(Date.now()));
   return { added };
 }

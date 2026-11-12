@@ -78,6 +78,7 @@ export function createRuntime() {
     }
   }
 
+  let lastArchivePass = 0;
   async function runCycle(log: (m: string) => void = console.log): Promise<void> {
     if (running) return;
     const g = gmailBackground();
@@ -88,7 +89,7 @@ export function createRuntime() {
       const analysed = store.countUnanalyzed() ? await runTriage(runner, store, log, await agenda(log)) : [];
       if (analysed.length) store.setMeta('lastTriage', String(Date.now()));
       await notifier.notifyReplies(analysed);
-      const unsub = await autoUnsubscribe(g, store, analysed, await g.profileEmail());
+      const unsub = analysed.length ? await autoUnsubscribe(g, store, analysed, await g.profileEmail()) : [];
       if (unsub.length) log(`[auto] désabonné de : ${unsub.join(', ')}`);
       // Daily backup of the whole database.
       if (Date.now() - Number(store.getMeta('lastBackup') ?? 0) > 86_400_000) {
@@ -100,13 +101,17 @@ export function createRuntime() {
           log(`[backup] échec : ${(e as Error).message}`);
         }
       }
-      // Local mail base: 60 full mails per cycle at most (3,600 quota units), so it never starves the rest.
-      try {
-        const arch = await syncArchive(g, store, archive, { months: settings().archiveMonths, batch: 60 });
-        if (arch.added) log(`[base] +${arch.added} mails (${archive.count()} au total${arch.done ? '' : ', remplissage en cours'})`);
-      } catch (e) {
-        if (e instanceof GmailDisconnected) throw e;
-        log(`[base] synchro interrompue : ${(e as Error).message}`);
+      // Local mail base: 60 full mails per pass at most (3,600 quota units), and one pass every 5 minutes at most,
+      // so a 30-second check never starves the rest of the Gmail quota.
+      if (Date.now() - lastArchivePass >= 5 * 60_000) {
+        lastArchivePass = Date.now();
+        try {
+          const arch = await syncArchive(g, store, archive, { months: settings().archiveMonths, batch: 60 });
+          if (arch.added) log(`[base] +${arch.added} mails (${archive.count()} au total${arch.done ? '' : ', remplissage en cours'})`);
+        } catch (e) {
+          if (e instanceof GmailDisconnected) throw e;
+          log(`[base] synchro interrompue : ${(e as Error).message}`);
+        }
       }
       error = null;
       if (added || analysed.length) log(`[cycle] ${added} nouveaux, ${analysed.length} triés`);

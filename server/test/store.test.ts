@@ -40,6 +40,25 @@ describe('store', () => {
     expect(news[0].analysis?.summary).toEqual(['hebdo']);
   });
 
+  it('marks mails read or unread through the UNREAD label', () => {
+    const s = openStore(':memory:');
+    s.upsertMessages([mail('a'), mail('b', { labelIds: ['INBOX', 'UNREAD'] })]);
+    s.setUnread(['a'], true);
+    s.setUnread(['b'], false);
+    expect(s.getMail('a')?.labelIds).toEqual(['INBOX', 'UNREAD']);
+    expect(s.getMail('b')?.labelIds).toEqual(['INBOX']);
+    s.setUnread(['a'], true);
+    expect(s.getMail('a')?.labelIds).toEqual(['INBOX', 'UNREAD']);
+  });
+
+  it('follows the unread state seen in Gmail for the inbox', () => {
+    const s = openStore(':memory:');
+    s.upsertMessages([mail('a'), mail('b', { labelIds: ['INBOX', 'UNREAD'] })]);
+    s.syncUnread(new Set(['a']));
+    expect(s.getMail('a')?.labelIds).toContain('UNREAD');
+    expect(s.getMail('b')?.labelIds).not.toContain('UNREAD');
+  });
+
   it('stores meta values and push subscriptions', () => {
     const s = openStore(':memory:');
     s.setMeta('lastSync', '123');

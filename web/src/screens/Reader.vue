@@ -7,10 +7,11 @@ import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
+import { isUnread } from '../unread.ts';
 import UnsubBar from './UnsubBar.vue';
 
 const props = defineProps<{ mail: MailItem; busy: boolean }>();
-const emit = defineEmits<{ back: []; archive: []; trash: []; handled: []; label: [id: string, name: string] }>();
+const emit = defineEmits<{ back: []; archive: []; trash: []; handled: []; label: [id: string, name: string]; toggleRead: [] }>();
 const { t } = useI18n();
 
 const a = computed(() => props.mail.analysis);
@@ -54,6 +55,7 @@ function eventDate(start: string, end: string) {
         <button v-if="a?.category === 'reply'" type="button" class="btn handled" :aria-label="t('reader.handled')" :title="t('reader.handledHint')" :disabled="busy" @click="emit('handled')">
           <Icon name="check" :size="16" /> <span class="wide-only">{{ t('reader.handled') }}</span>
         </button>
+        <button type="button" :class="['btn btn-icon', { 'is-unread': isUnread(mail) }]" :aria-label="isUnread(mail) ? t('reader.markRead') : t('reader.markUnread')" :title="isUnread(mail) ? t('reader.markRead') : t('reader.markUnread')" :aria-pressed="isUnread(mail)" @click="emit('toggleRead')"><Icon name="mail" :size="18" /></button>
         <button type="button" class="btn btn-icon" :aria-label="t('reader.archive')" :title="t('reader.archive')" :disabled="busy" @click="emit('archive')"><Icon name="archive" :size="18" /></button>
         <button type="button" class="btn btn-icon" :aria-label="t('reader.file')" :title="t('reader.file')" :aria-expanded="menu" :disabled="busy" @click="openMenu"><Icon name="folder" :size="18" /></button>
         <button type="button" class="btn btn-icon btn-danger" :aria-label="t('reader.trash')" aria-keyshortcuts="Enter" :title="t('reader.trashHint')" :disabled="busy" @click="emit('trash')"><Icon name="trash" :size="18" /></button>

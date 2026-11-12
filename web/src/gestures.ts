@@ -1,4 +1,4 @@
-/** Touch gesture rules (pure, so they are testable): swipe a mail to trash it, swipe an open mail to go back. */
+/** Touch gesture rules (pure, so they are testable): swipe a mail to mark it unread or trash it, swipe an open mail to go back. */
 
 const LOCK_PX = 10;
 
@@ -10,9 +10,14 @@ export function axis(dx: number, dy: number): 'x' | 'y' | null {
 
 const flick = (dx: number, ms: number, min: number) => dx > min && dx / Math.max(ms, 1) > 0.5;
 
-/** A mail dragged to the right past a third of its width, or flicked right, goes to the trash. */
-export function swipeTrashes(dx: number, width: number, ms: number): boolean {
-  return dx > 0 && (dx > width / 3 || flick(dx, ms, 60));
+/**
+ * A mail dragged past a third of its width, or flicked: to the right it switches read / unread, to the left it goes
+ * to the trash (like Apple Mail).
+ */
+export function swipeAction(dx: number, width: number, ms: number): 'read' | 'trash' | null {
+  const d = Math.abs(dx);
+  if (!(d > width / 3 || flick(d, ms, 60))) return null;
+  return dx > 0 ? 'read' : 'trash';
 }
 
 /** An open mail swiped to the right goes back to the list. */

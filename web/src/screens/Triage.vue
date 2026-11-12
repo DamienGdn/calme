@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CAT_CLASS, CAT_COLOR, post, when, type Category, type MailItem } from '../api.ts';
 import Icon from '../components/Icon.vue';
@@ -8,9 +8,10 @@ import TabBar from '../components/TabBar.vue';
 import { axis, swipeBack } from '../gestures.ts';
 import { dateLocale } from '../i18n.ts';
 import { enablePush, isSubscribed, pushSupported } from '../push.ts';
-import { goTo, notify, notifyError, refresh, store } from '../store.ts';
+import { goTo, notify, notifyError, refresh, setRead, store } from '../store.ts';
 import { closeTab, cycleTab, openTab, pruneTabs, toggleCompare } from '../tabLogic.ts';
 import { tabs, updateTabs, useMedia } from '../tabs.ts';
+import { isUnread } from '../unread.ts';
 import Reader from './Reader.vue';
 
 const props = defineProps<{ filter: Category | 'all' }>();
@@ -90,8 +91,24 @@ function select(m: MailItem, background = false) {
     return;
   }
   updateTabs((st) => openTab(st, m.id));
+  void setRead([m.id], true);
   openReading();
   if (phone.value) window.scrollTo({ top: 0 });
+}
+
+// A mail opened (clicked, tab switched to, from a notification) is read; "Unread" from the mail, a swipe or a
+// selection puts it back. On the phone, marking the open mail unread returns to the list, like Gmail.
+watch(
+  () => [tabs.value.active, Boolean(store.state)] as const,
+  ([id, loaded]) => {
+    if (id && loaded) void setRead([id], true);
+  },
+  { immediate: true },
+);
+function toggleRead(m: MailItem) {
+  const unread = isUnread(m);
+  void setRead([m.id], unread);
+  if (!unread && phone.value && reading.value && current.value?.id === m.id) closeReading();
 }
 
 // Selection: long press (phone) or ⇧-click starts it; while selecting, a tap toggles a mail.
@@ -141,6 +158,16 @@ const undoHandled = (id: string) => ({
     }
   },
 });
+
+/** The selection goes unread, or read when every selected mail is already unread. */
+const selectionUnread = computed(() => [...selected.value].every((id) => { const m = byId(id); return m ? isUnread(m) : true; }));
+async function readSelection() {
+  const ids = [...selected.value];
+  if (!ids.length) return;
+  const read = selectionUnread.value;
+  clearSelection();
+  await setRead(ids, read);
+}
 
 async function trashSelection() {
   const ids = [...selected.value];
@@ -240,15 +267,18 @@ function onKey(e: KeyboardEvent) {
     updateTabs(toggleCompare);
   }
 }
-onMounted(() => {
+// The screen stays alive while another tab is shown (App.vue): its keys and back gesture only while it is visible.
+onActivated(() => {
   window.addEventListener('keydown', onKey);
   window.addEventListener('popstate', onPop);
-  window.setTimeout(() => (animateRows.value = false), 1500);
-  if (canPush) void isSubscribed().then((v) => (pushOn.value = v));
 });
-onBeforeUnmount(() => {
+onDeactivated(() => {
   window.removeEventListener('keydown', onKey);
   window.removeEventListener('popstate', onPop);
+});
+onMounted(() => {
+  window.setTimeout(() => (animateRows.value = false), 1500);
+  if (canPush) void isSubscribed().then((v) => (pushOn.value = v));
 });
 
 async function sync() {
@@ -338,12 +368,21 @@ function askCalme() {
         <button type="button" class="btn btn-icon" :aria-label="t('triage.clearSelection')" @click="clearSelection">×</button>
         <span class="grow">{{ t('triage.selected', selected.size) }}</span>
         <button type="button" class="btn" @click="selectAll">{{ t('triage.selectAll') }}</button>
+        <button type="button" class="btn" @click="readSelection"><Icon name="mail" :size="16" /> {{ selectionUnread ? t('triage.markRead') : t('triage.markUnread') }}</button>
         <button type="button" class="btn btn-danger" :disabled="busy" @click="trashSelection"><Icon name="trash" :size="16" /> {{ t('triage.trashShort') }}</button>
       </div>
-      <SwipeRow v-for="(m, i) in list" :key="m.id" :label="t('triage.trashShort')" @trash="trash(m)" @hold="toggleSelected(m.id)">
+      <SwipeRow
+        v-for="(m, i) in list"
+        :key="m.id"
+        :trash-label="t('triage.trashShort')"
+        :read-label="isUnread(m) ? t('triage.markRead') : t('triage.markUnread')"
+        @trash="trash(m)"
+        @read="toggleRead(m)"
+        @hold="toggleSelected(m.id)"
+      >
         <button
           type="button"
-          :class="['row', { rise: animateRows, open: tabs.ids.includes(m.id), picked: selected.has(m.id) }]"
+          :class="['row', { rise: animateRows, open: tabs.ids.includes(m.id), picked: selected.has(m.id), unread: isUnread(m) }]"
           :style="{ animationDelay: `${Math.min(i, 10) * 50}ms` }"
           :aria-current="!selecting && current?.id === m.id"
           :aria-pressed="selecting ? selected.has(m.id) : undefined"
@@ -354,7 +393,7 @@ function askCalme() {
           <span v-if="selecting" class="pick" aria-hidden="true"><Icon v-if="selected.has(m.id)" name="check" :size="12" /></span>
           <span v-else class="mark" :style="{ background: m.analysis ? CAT_COLOR[m.analysis.category] : 'var(--line)' }" aria-hidden="true" />
           <span class="from">{{ m.fromName }}</span>
-          <span class="time">{{ when(m.date) }}</span>
+          <span class="time"><i v-if="isUnread(m)" class="udot" /><span v-if="isUnread(m)" class="sr">{{ t('triage.unread') }}, </span>{{ when(m.date) }}</span>
           <span class="subj">{{ m.subject || t('common.noSubject') }}</span>
           <span class="one">{{ m.analysis?.summary[0] ?? (m.analysis ? m.snippet : t('triage.notRead')) }}</span>
         </button>
@@ -391,6 +430,7 @@ function askCalme() {
           @trash="trash(current)"
           @handled="act(current, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(current, 'label', t('triage.filed', { name }), { labelId: id })"
+          @toggle-read="toggleRead(current)"
         />
         <Reader
           v-if="second"
@@ -402,6 +442,7 @@ function askCalme() {
           @trash="trash(second)"
           @handled="act(second, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(second, 'label', t('triage.filed', { name }), { labelId: id })"
+          @toggle-read="toggleRead(second)"
         />
       </div>
     </div>

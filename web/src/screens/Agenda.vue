@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
 import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
@@ -98,7 +98,8 @@ const reload = () => {
   void load();
   if (view.value?.connected !== false) void loadList(todayKey, until.value);
 };
-onMounted(async () => {
+// Kept alive between tabs (App.vue): the last view stays on screen while it is refreshed.
+onActivated(async () => {
   await load();
   if (view.value?.connected) void loadList(todayKey, until.value);
   else listEvents.value = [];

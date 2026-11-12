@@ -1,7 +1,8 @@
 <script setup lang="ts">
 export type IconName =
   | 'sort' | 'pen' | 'trash' | 'folder' | 'archive' | 'refresh' | 'sun' | 'moon' | 'back' | 'arrow'
-  | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns' | 'check';
+  | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns' | 'check'
+  | 'mail' | 'clock';
 
 defineProps<{ name: IconName; size?: number }>();
 
@@ -22,6 +23,8 @@ const PATHS: Record<IconName, string[]> = {
   calendar: ['M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'M16 3v4M8 3v4M3 10h18'],
   unsub: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 7 9 6 9-6', 'M4 20 20 4'],
   check: ['M5 12.5l4.5 4.5L19 7.5'],
+  mail: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 7 9 6 9-6'],
+  clock: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z', 'M12 7v5l3 2'],
   columns: ['M5 4h5v16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z', 'M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5Z'],
   gear: [
     'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z',

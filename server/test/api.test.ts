@@ -184,6 +184,26 @@ describe('api actions', () => {
     expect((await app.request('/api/mail/zzz/archive', { method: 'POST', headers: auth })).status).toBe(404);
   });
 
+  it('marks mails unread then read again, in Gmail and in Calm', async () => {
+    const { app, g, store } = setup();
+    const send = (body: unknown) => app.request('/api/mails/read', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await send({ ids: ['a', 'b'], read: false })).status).toBe(200);
+    expect(g.calls.filter((c) => c.method === 'modify').map((c) => c.args)).toEqual([['a', ['UNREAD'], []], ['b', ['UNREAD'], []]]);
+    expect(store.getMail('b')?.labelIds).toContain('UNREAD');
+    expect((await send({ ids: ['b'], read: true })).status).toBe(200);
+    expect(g.calls.at(-1)?.args).toEqual(['b', [], ['UNREAD']]);
+    expect(store.getMail('b')?.labelIds).not.toContain('UNREAD');
+  });
+
+  it('refuses a bad read request and an unknown mail', async () => {
+    const { app } = setup();
+    const send = (body: unknown) => app.request('/api/mails/read', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await send({ ids: [], read: true })).status).toBe(400);
+    expect((await send({ ids: ['a'], read: 'yes' })).status).toBe(400);
+    expect((await send({ ids: [1], read: true })).status).toBe(400);
+    expect((await send({ ids: ['zzz'], read: true })).status).toBe(404);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

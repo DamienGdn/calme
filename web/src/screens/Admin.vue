@@ -222,7 +222,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           <dt>{{ t('admin.frequency') }}</dt>
           <dd>
             <select class="select" :value="v.settings.intervalMin" :aria-label="t('admin.frequency')" @change="save({ intervalMin: Number(($event.target as HTMLSelectElement).value) })">
-              <option v-for="m in [2, 5, 10, 15, 30, 60]" :key="m" :value="m">{{ t('admin.every', { n: m }) }}</option>
+              <option v-for="m in [0.5, 1, 2, 5, 10, 15, 30, 60]" :key="m" :value="m">{{ m < 1 ? t('admin.everySec', { n: m * 60 }) : t('admin.every', { n: m }) }}</option>
             </select>
           </dd>
           <dt>{{ t('admin.box') }}</dt>

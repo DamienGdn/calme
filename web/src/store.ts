@@ -1,6 +1,7 @@
 import { reactive, ref } from 'vue';
-import { api, getToken, setToken, Unauthorized, type AppState } from './api.ts';
+import { api, getToken, post, setToken, Unauthorized, type AppState } from './api.ts';
 import { canRefract } from './glass.ts';
+import { isUnread, withUnread } from './unread.ts';
 
 /**
  * Liquid glass of the phone menu bar (see glass.ts): refraction strength (0 = off), depth of the bent rim and
@@ -82,6 +83,23 @@ export async function refresh() {
       setToken(null);
       store.paired = false;
     }
+  }
+}
+
+/**
+ * Marks mails read or unread: shown at once, then saved in Gmail; on failure the list comes back as it was.
+ * Mails already in that state are left alone (opening a read mail costs no call).
+ */
+export async function setRead(ids: string[], read: boolean) {
+  const mails = (store.state?.emails ?? []).filter((m) => ids.includes(m.id) && isUnread(m) === read);
+  if (!mails.length) return;
+  const before = new Map(mails.map((m) => [m.id, m.labelIds]));
+  for (const m of mails) m.labelIds = withUnread(m.labelIds, !read);
+  try {
+    await post('/api/mails/read', { ids: mails.map((m) => m.id), read });
+  } catch (e) {
+    for (const m of mails) m.labelIds = before.get(m.id) ?? m.labelIds;
+    notifyError(e);
   }
 }
 

@@ -32,6 +32,13 @@ export async function untrash(g: GmailPort, s: Store, id: string) {
   s.restoreToInbox([id]);
 }
 
+/** Marks mails read or unread, in Gmail (the UNREAD label) and in Calm. */
+export async function setRead(g: GmailPort, s: Store, ids: string[], read: boolean) {
+  for (const id of ids) need(s, id);
+  for (const id of ids) await g.modify(id, read ? [] : ['UNREAD'], read ? ['UNREAD'] : []);
+  s.setUnread(ids, !read);
+}
+
 export async function label(g: GmailPort, s: Store, id: string, labelId: string) {
   need(s, id);
   await g.modify(id, [labelId], ['INBOX']);

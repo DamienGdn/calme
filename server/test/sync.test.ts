@@ -33,6 +33,18 @@ describe('syncInbox', () => {
     expect(s.listInbox().map((m) => m.id)).toEqual(['a']);
   });
 
+  it('follows what was read or marked unread in Gmail', async () => {
+    const s = openStore(':memory:');
+    const g = fakeGmail(['a', 'b']);
+    g.state.unread = ['a'];
+    await syncInbox(g.port, s);
+    expect(s.listInbox().filter((m) => m.labelIds.includes('UNREAD')).map((m) => m.id)).toEqual(['a']);
+    g.state.unread = ['b'];
+    await syncInbox(g.port, s);
+    expect(s.listInbox().filter((m) => m.labelIds.includes('UNREAD')).map((m) => m.id)).toEqual(['b']);
+    expect(g.calls.some((c) => c.method === 'listInboxIds' && c.args[0] === 'in:inbox is:unread newer_than:30d')).toBe(true);
+  });
+
   it('records the last sync time', async () => {
     const s = openStore(':memory:');
     await syncInbox(fakeGmail(['a']).port, s);
