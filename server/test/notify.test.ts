@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createNotifier } from '../src/notify.ts';
+import { openReminders } from '../src/reminders.ts';
+import { saveSettings } from '../src/settings.ts';
 import { openStore } from '../src/store.ts';
 import type { Analysis } from '../src/types.ts';
 import { mail } from './fixtures.ts';
@@ -8,6 +10,26 @@ const reply = (id: string): Analysis => ({ id, category: 'reply', summary: [], a
 const vapid = { publicKey: 'pub', privateKey: 'priv' };
 
 describe('notifier', () => {
+  it('pushes each due reminder once, and waits out the quiet hours', async () => {
+    const s = openStore(':memory:');
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    const r = openReminders(s.db);
+    r.add({ text: 'Compteur de chantier', due: 1000 }, 1);
+    const sent: string[] = [];
+    let hour = 3;
+    const n = createNotifier(s, vapid, async (_s, p) => {
+      sent.push(p);
+    }, () => new Date(2026, 10, 12, hour));
+    saveSettings(s, { quietStart: 22, quietEnd: 7 });
+    await n.notifyReminders(r);
+    expect(sent).toHaveLength(0);
+    hour = 9;
+    await n.notifyReminders(r);
+    await n.notifyReminders(r);
+    expect(sent.map((p) => JSON.parse(p))).toEqual([{ title: 'Rappel', body: 'Compteur de chantier', url: '/#/rappels' }]);
+  });
+
+
   it('sends one push per reply mail with sender and subject', async () => {
     const s = openStore(':memory:');
     s.upsertMessages([mail('a', { subject: 'Dîner samedi ?' })]);

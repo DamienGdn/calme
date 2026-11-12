@@ -1,9 +1,9 @@
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, setRead, trash, unsubscribe, untrash } from './actions.ts';
-import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, type CalendarPort, type NewEvent } from './calendar.ts';
+import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, TIMEZONE, type CalendarPort, type NewEvent } from './calendar.ts';
 import type { ClaudeRunner } from './claude.ts';
 import type { Config } from './config.ts';
 import { GmailDisconnected, type GmailPort } from './gmail.ts';
@@ -14,10 +14,11 @@ import { decodeEntities, inlineImages, parseAddress, parseGmailMessage } from '.
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
-import { draftQuestions, proposeSlots, redraft, suggestSubject, type Tone } from './triage.ts';
+import { draftQuestions, proposeSlots, readAgenda, redraft, suggestReminder, suggestSubject, type Tone } from './triage.ts';
 import { searchMail } from './search.ts';
 import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts';
 import type { Archive } from './archive.ts';
+import { openReminders } from './reminders.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
 
@@ -502,6 +503,79 @@ export function createApp(d: Deps) {
     const { question } = await c.req.json<{ question?: string }>();
     if (!question?.trim()) return c.json({ error: 'Pose une question' }, 400);
     return c.json(await searchMail(d.runner, d.gmail(), question.slice(0, 500), d.archive));
+  });
+
+  // Reminders: things to do later, typed in or taken from a mail ("not now").
+  const reminders = openReminders(store.db);
+  const reminderText = (v: unknown) => (typeof v === 'string' && v.trim() && v.trim().length <= 300 ? v.trim() : null);
+  const reminderDue = (v: unknown): number | null | undefined =>
+    v === null || v === undefined ? null : typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined;
+
+  app.get('/api/reminders', (c) => c.json(reminders.list()));
+
+  app.post('/api/reminders', async (c) => {
+    const b = await c.req.json<{ text?: unknown; due?: unknown; mailId?: unknown }>();
+    const text = reminderText(b.text);
+    const due = reminderDue(b.due);
+    if (!text || due === undefined) return c.json({ error: 'Texte (300 caractères max) et date valides attendus' }, 400);
+    let mail: { id: string; subject: string; fromName: string } | undefined;
+    if (b.mailId !== undefined) {
+      const m = typeof b.mailId === 'string' ? store.getMail(b.mailId) : null;
+      if (!m) return c.json({ error: 'Mail introuvable' }, 404);
+      mail = { id: m.id, subject: m.subject, fromName: m.fromName };
+    }
+    return c.json(reminders.add({ text, due, mail }));
+  });
+
+  app.patch('/api/reminders/:id', async (c) => {
+    const b = await c.req.json<{ text?: unknown; due?: unknown; done?: unknown }>();
+    const patch: { text?: string; due?: number | null; done?: boolean } = {};
+    if (b.text !== undefined) {
+      const text = reminderText(b.text);
+      if (!text) return c.json({ error: 'Texte invalide' }, 400);
+      patch.text = text;
+    }
+    if (b.due !== undefined) {
+      const due = reminderDue(b.due);
+      if (due === undefined) return c.json({ error: 'Date invalide' }, 400);
+      patch.due = due;
+    }
+    if (b.done !== undefined) {
+      if (typeof b.done !== 'boolean') return c.json({ error: 'done invalide' }, 400);
+      patch.done = b.done;
+    }
+    const r = reminders.update(c.req.param('id'), patch);
+    return r ? c.json(r) : c.json({ error: 'Rappel introuvable' }, 404);
+  });
+
+  app.delete('/api/reminders/:id', (c) =>
+    reminders.remove(c.req.param('id')) ? c.json({ ok: true }) : c.json({ error: 'Rappel introuvable' }, 404),
+  );
+
+  app.post('/api/mail/:id/reminder', async (c) => {
+    const mail = store.getMail(c.req.param('id'));
+    if (!mail) return c.json({ error: 'Mail introuvable' }, 404);
+    return c.json(await suggestReminder(d.runner, mail));
+  });
+
+  // Calm's reading of the coming week; asked again only when the agenda, the reminders or the day change.
+  app.post('/api/agenda/brief', async (c) => {
+    const cal = d.calendar?.();
+    const hidden = new Set(getSettings(store, defaults()).hiddenCalendars);
+    const events = cal ? (await cal.upcoming(7)).filter((e) => !e.calendar || !hidden.has(e.calendar.id)) : [];
+    const horizon = Date.now() + 7 * 86400_000;
+    const fmt = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: TIMEZONE });
+    const open = reminders.list().filter((r) => !r.done && (r.due === null || r.due <= horizon));
+    const remindersText = open.length
+      ? open.map((r) => `- ${r.due === null ? 'sans date' : (r.due < Date.now() ? 'en retard, ' : '') + fmt.format(new Date(r.due))} : ${r.text}`).join('\n')
+      : 'Aucun rappel.';
+    const agenda = formatAgenda(events);
+    const key = createHash('sha256').update([new Date().toDateString(), agenda, remindersText].join('\u0000')).digest('hex');
+    const cached = metaJson<{ key?: string; glance: string; points: string[]; at: number } | null>('agendaBrief', null);
+    if (cached?.key === key) return c.json({ glance: cached.glance, points: cached.points, at: cached.at });
+    const brief = { ...(await readAgenda(d.runner, { agenda, reminders: remindersText })), at: Date.now() };
+    store.setMeta('agendaBrief', JSON.stringify({ key, ...brief }));
+    return c.json(brief);
   });
 
   app.post('/api/agenda/dismiss/:mailId', (c) => {

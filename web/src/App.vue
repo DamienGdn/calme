@@ -14,6 +14,7 @@ import Editor from './screens/Editor.vue';
 import Folders from './screens/Folders.vue';
 import Newsletters from './screens/Newsletters.vue';
 import Pairing from './screens/Pairing.vue';
+import Reminders from './screens/Reminders.vue';
 import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
@@ -118,6 +119,7 @@ const tools: { r: Route; label: string; icon: IconName }[] = [
   { r: 'menage', label: 'nav.cleanup', icon: 'trash' },
   { r: 'desabonnements', label: 'nav.unsubscribe', icon: 'unsub' },
   { r: 'agenda', label: 'nav.agenda', icon: 'calendar' },
+  { r: 'rappels', label: 'nav.reminders', icon: 'clock' },
 ];
 const tabs: [Route, string, IconName][] = [
   ['tri', 'nav.triage', 'sort'],
@@ -198,6 +200,7 @@ const depth = (name: string) => name.split('/').length - 1;
       <Folders v-else-if="route === 'dossiers'" :label-id="loc.arg" />
       <Admin v-else-if="route === 'admin'" />
       <Search v-else-if="route === 'recherche'" :initial="loc.arg" />
+      <Reminders v-else-if="route === 'rappels'" />
       </KeepAlive>
     </main>
 

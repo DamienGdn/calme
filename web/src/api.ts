@@ -7,6 +7,19 @@ export type { Category, MailView };
 /** A mail as listed in /api/state: everything but the body, fetched on demand with useMailBody. */
 export type MailItem = Omit<MailView, 'text'>;
 
+/** Something to do later, often taken from a mail (server/src/reminders.ts). */
+export interface Reminder {
+  id: string;
+  text: string;
+  due: number | null;
+  mailId: string | null;
+  mailSubject: string | null;
+  mailFrom: string | null;
+  createdAt: number;
+  done: boolean;
+  doneAt: number | null;
+}
+
 export interface AppState {
   gmail: 'connected' | 'disconnected' | 'no-credentials';
   counts: Record<Category, number>;

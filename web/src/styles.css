@@ -947,3 +947,36 @@ html.kb-open .fab { display: none; }
 @media (max-width: 720px) {
   .tabbar { transform: translateZ(0); will-change: transform; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 }
+
+/* Reminders (agenda and their own page): a tick circle, the task, when and from which mail; overdue in warm. */
+.reminders { display: flex; flex-direction: column; gap: 10px; }
+.reminders-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rem-group { display: flex; flex-direction: column; }
+.rem-group-title { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 0 2px; }
+.rem-group-title.late { color: var(--hot); }
+.rem { display: flex; align-items: center; gap: 12px; min-height: 56px; border-bottom: 1px solid var(--line); }
+.rem-check { flex: none; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--muted); background: transparent; display: grid; place-items: center; color: var(--prim-fg); padding: 0; }
+.rem-check:hover { border-color: var(--accent); }
+.rem-check.on { background: var(--prim-bg); border-color: var(--prim-bg); }
+.rem-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border: 0; background: transparent; text-align: left; color: var(--ink); }
+.rem-text { font-size: 15px; line-height: 1.35; }
+.rem-meta { display: flex; gap: 10px; min-width: 0; font-size: 12px; color: var(--muted); }
+.rem-meta .mono { flex: none; }
+.rem-meta .late { color: var(--hot); }
+.rem-meta .ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rem.is-done .rem-text { color: var(--muted); text-decoration: line-through; }
+.rem-done summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 8px 0; }
+.remind-what { position: relative; display: block; }
+.remind-what textarea { width: 100%; border: 1px solid var(--line); border-radius: 14px; background: var(--surf2); color: var(--ink); padding: 12px 14px; font-family: 'Fraunces', Georgia, serif; font-size: 20px; line-height: 1.3; resize: vertical; outline: none; }
+.remind-what textarea:focus { border-color: var(--sel-border); }
+.remind-thinking { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.remind-thinking .dot, .dot.pulsing { animation: pulse 1.2s ease-in-out infinite; }
+.remind-when { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.remind-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.when-chip { min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surf); color: var(--ink); font-size: 14px; }
+.when-chip[aria-pressed='true'] { background: var(--prim-bg); color: var(--prim-fg); border-color: var(--prim-bg); font-weight: 600; }
+.remind-date { color: var(--ink); }
+.remind-due { margin: 0; font-size: 13px; }
+.remind-due::first-letter { text-transform: uppercase; }
+.remind-foot { display: flex; justify-content: flex-end; gap: 10px; }
+.agenda-brief .points li { grid-template-columns: 110px minmax(0, 1fr); }

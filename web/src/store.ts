@@ -45,6 +45,8 @@ export const store = reactive({
   themePref: readThemePref(),
   /** Per-device look of the phone menu bar's liquid glass. */
   glass: readGlass(),
+  /** Bumped when a reminder is saved anywhere, so lists and the agenda reading reload. */
+  remindersVersion: 0,
 });
 
 export interface Draft {
@@ -138,8 +140,8 @@ export function setThemePref(pref: ThemePref) {
 darkQuery.addEventListener('change', () => store.themePref === 'system' && applyTheme());
 applyTheme();
 
-export type Route = 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
-const ROUTES: Route[] = ['tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];
+export type Route = 'rappels' | 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
+const ROUTES: Route[] = ['rappels', 'tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];
 
 /** Hash routes: #/tri[/reply], #/dossiers[/<labelId>], #/recherche[/<question>]… */
 export function parseHash(): { route: Route; arg: string } {

@@ -34,6 +34,7 @@ function setup(gmailConnected = true) {
   const fetched: { url: string; init?: RequestInit }[] = [];
   const created: unknown[] = [];
   const saved: unknown[] = [];
+  const asked: string[] = [];
   store.saveAnalyses([
     { id: 'a', category: 'trash', summary: [], action: '', replies: [], group: 'Promotions',
       event: { title: 'AG', start: '2026-12-03T18:30:00+01:00', end: '2026-12-03T20:00:00+01:00', location: null } },
@@ -52,6 +53,10 @@ function setup(gmailConnected = true) {
         ? { subject: 'Petit retard', body: 'Coucou Sophie, j’aurai 10 minutes de retard. [Prénom]' }
         : JSON.stringify(i.schema).includes('gmailQuery')
         ? { gmailQuery: 'from:syndic AG', explanation: 'Mails du syndic sur l’AG', keywords: ['syndic', 'AG'] }
+        : JSON.stringify(i.schema).includes('"remindAt"')
+        ? { text: 'Regarder l’achat d’un compteur électrique de chantier', remindAt: '2099-11-14T09:00:00+01:00' }
+        : JSON.stringify(i.schema).includes('"glance"')
+        ? (asked.push('glance'), { glance: 'Semaine calme : **dentiste samedi**.', points: ['Samedi 10h — dentiste', '', 'Penser au compteur'] })
         : JSON.stringify(i.schema).includes('"sections"')
         ? { lead: 'L’AG a lieu le 3 décembre à 18h30.', sections: [], points: [], relevantIds: ['n1'] }
         : JSON.stringify(i.schema).includes('slots')
@@ -65,7 +70,7 @@ function setup(gmailConnected = true) {
           }
         : { draft: 'Nouveau brouillon' },
     cfg,
-    notifier: { notifyReplies: async () => {}, test: async () => true },
+    notifier: { notifyReplies: async () => {}, notifyReminders: async () => {}, test: async () => true },
     runCycle: async () => {},
     status: () => ({ running: false, error: null }),
     calendar: () => ({
@@ -110,7 +115,7 @@ function setup(gmailConnected = true) {
       return new Response('ok');
     },
   });
-  return { app, store, g, fetched, created, archive, saved };
+  return { app, store, g, fetched, created, archive, saved, asked };
 }
 
 const auth = { Authorization: `Bearer ${TOKEN}` };
@@ -202,6 +207,45 @@ describe('api actions', () => {
     expect((await send({ ids: ['a'], read: 'yes' })).status).toBe(400);
     expect((await send({ ids: [1], read: true })).status).toBe(400);
     expect((await send({ ids: ['zzz'], read: true })).status).toBe(404);
+  });
+
+  it('keeps reminders: from a mail, edited, done, deleted', async () => {
+    const { app } = setup();
+    const json = (method: string, path: string, body?: unknown) =>
+      app.request(path, { method, headers: { ...auth, 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const made = await (await json('POST', '/api/reminders', { text: '  Compteur de chantier ', due: 4102444800000, mailId: 'a' })).json();
+    expect(made).toMatchObject({ text: 'Compteur de chantier', due: 4102444800000, mailId: 'a', mailSubject: 'Sujet a', mailFrom: 'Sophie Martin', done: false });
+    expect((await json('PATCH', `/api/reminders/${made.id}`, { done: true })).status).toBe(200);
+    expect((await (await json('GET', '/api/reminders')).json())[0]).toMatchObject({ id: made.id, done: true });
+    expect((await json('DELETE', `/api/reminders/${made.id}`)).status).toBe(200);
+    expect(await (await json('GET', '/api/reminders')).json()).toEqual([]);
+  });
+
+  it('refuses a reminder without text, with a bad date or an unknown mail', async () => {
+    const { app } = setup();
+    const send = (body: unknown) => app.request('/api/reminders', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await send({ text: ' ' })).status).toBe(400);
+    expect((await send({ text: 'x'.repeat(301) })).status).toBe(400);
+    expect((await send({ text: 'ok', due: 'demain' })).status).toBe(400);
+    expect((await send({ text: 'ok', mailId: 'zzz' })).status).toBe(404);
+    expect((await app.request('/api/reminders/zzz', { method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: '{"done":true}' })).status).toBe(404);
+  });
+
+  it('asks Calm what to remember from a mail, and when', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/mail/a/reminder', { method: 'POST', headers: auth })).json();
+    expect(r).toEqual({ text: 'Regarder l’achat d’un compteur électrique de chantier', due: Date.parse('2099-11-14T09:00:00+01:00') });
+  });
+
+  it('reads the agenda once, then serves it again until the agenda or reminders change', async () => {
+    const { app, asked } = setup();
+    const brief = async () => (await app.request('/api/agenda/brief', { method: 'POST', headers: auth })).json();
+    expect(await brief()).toMatchObject({ glance: 'Semaine calme : **dentiste samedi**.', points: ['Samedi 10h — dentiste', 'Penser au compteur'] });
+    await brief();
+    expect(asked).toHaveLength(1);
+    await app.request('/api/reminders', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ text: 'Compteur', due: Date.now() + 86400_000 }) });
+    await brief();
+    expect(asked).toHaveLength(2);
   });
 
   it('archives by removing the INBOX label', async () => {

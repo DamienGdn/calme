@@ -2,7 +2,9 @@
 import { computed, onActivated, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
+import AgendaBrief from '../components/AgendaBrief.vue';
 import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
+import RemindersPanel from '../components/RemindersPanel.vue';
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
@@ -206,6 +208,9 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
     <p>{{ t('agenda.limited') }}</p>
     <a class="btn" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.reconnect') }}</a>
   </div>
+
+  <AgendaBrief />
+  <RemindersPanel compact />
 
   <NewEvent v-if="form" :day="formAt.day" :time="formAt.time" :event="editing ?? undefined" :calendars="writable" @close="form = false; editing = null" @done="form = false; editing = null; reload()" />
   <EventSheet v-if="opened" :event="opened" :can-delete="canDelete(opened)" :busy="deleting" @close="opened = null" @delete="removeOpened" @edit="editOpened" />

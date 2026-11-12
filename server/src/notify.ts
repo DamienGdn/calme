@@ -1,5 +1,6 @@
 import { sendNotification } from 'web-push';
 import { getSettings } from './settings.ts';
+import type { Reminders } from './reminders.ts';
 import type { Store } from './store.ts';
 import type { Analysis, PushSub } from './types.ts';
 
@@ -8,6 +9,8 @@ export type PushSender = (sub: PushSub, payload: string) => Promise<unknown>;
 export interface Notifier {
   /** Pushes newly sorted mails to subscribed phones, following the push mode and quiet hours. */
   notifyReplies(a: Analysis[]): Promise<void>;
+  /** Pushes reminders that fell due (once each), held back during quiet hours; none when notifications are off. */
+  notifyReminders(r: Reminders): Promise<void>;
   test(endpoint: string): Promise<boolean>;
 }
 
@@ -26,6 +29,23 @@ export function createNotifier(
   const sender: PushSender =
     send ?? ((sub, payload) => sendNotification(sub, payload, { vapidDetails: { subject, ...vapid }, TTL: 3600 }));
 
+  async function push(payloads: { title: string; body: string; url: string }[]) {
+    for (const sub of s.listPushSubs()) {
+      for (const p of payloads) {
+        try {
+          await sender(sub, JSON.stringify(p));
+        } catch (e) {
+          const code = (e as { statusCode?: number }).statusCode;
+          if (code === 404 || code === 410) {
+            s.removePushSub(sub.endpoint);
+            break;
+          }
+          console.error(`[push] échec : ${(e as Error).message}`);
+        }
+      }
+    }
+  }
+
   return {
     async notifyReplies(list) {
       const st = getSettings(s, { model: '', intervalMin: 0 });
@@ -37,21 +57,18 @@ export function createNotifier(
         mails.length > 3
           ? [{ title: st.language === 'en' ? (st.pushMode === 'all' ? `${mails.length} new mails` : `${mails.length} mails are waiting for your answer`) : st.pushMode === 'all' ? `${mails.length} nouveaux mails` : `${mails.length} mails attendent ta réponse`, body: mails.map((m) => m.fromName).slice(0, 4).join(', '), url: '/' }]
           : mails.map((m) => ({ title: m.fromName, body: m.subject, url: `/?mail=${encodeURIComponent(m.id)}` }));
-      for (const sub of s.listPushSubs()) {
-        for (const p of payloads) {
-          try {
-            await sender(sub, JSON.stringify(p));
-          } catch (e) {
-            const code = (e as { statusCode?: number }).statusCode;
-            if (code === 404 || code === 410) {
-              s.removePushSub(sub.endpoint);
-              break;
-            }
-            console.error(`[push] échec : ${(e as Error).message}`);
-          }
-        }
-      }
+      await push(payloads);
     },
+
+    async notifyReminders(r) {
+      const st = getSettings(s, { model: '', intervalMin: 0 });
+      const due = r.due(now().getTime());
+      if (!due.length || inQuietHours(now().getHours(), st.quietStart, st.quietEnd)) return;
+      r.markNotified(due.map((x) => x.id));
+      if (st.pushMode === 'off') return;
+      await push(due.map((x) => ({ title: st.language === 'en' ? 'Reminder' : 'Rappel', body: x.text, url: '/#/rappels' })));
+    },
+
     async test(endpoint) {
       const sub = s.listPushSubs().find((x) => x.endpoint === endpoint);
       if (!sub) return false;

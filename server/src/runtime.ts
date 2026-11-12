@@ -12,6 +12,7 @@ import { withLanguage } from './language.ts';
 import { loadConfig } from './config.ts';
 import { createGmailPort, createOAuth, GmailDisconnected, type GmailPort } from './gmail.ts';
 import { createNotifier } from './notify.ts';
+import { openReminders } from './reminders.ts';
 import { openStore } from './store.ts';
 import { syncInbox } from './sync.ts';
 import { runTriage } from './triage.ts';
@@ -30,6 +31,7 @@ export function createRuntime() {
   // Model read at call time so a change in the admin page applies without restart.
   const runner: ClaudeRunner = withLanguage((i) => cliRunner(settings().model)(i), () => settings().language);
   const notifier = createNotifier(store, cfg.vapid);
+  const reminders = openReminders(store.db);
   const archive = openArchive(store.db);
   // Installs configured before the setup wizard existed skip it.
   if (store.getMeta('setupDone') === null && baseOAuth.isConnected()) store.setMeta('setupDone', '1');
@@ -89,6 +91,7 @@ export function createRuntime() {
       const analysed = store.countUnanalyzed() ? await runTriage(runner, store, log, await agenda(log)) : [];
       if (analysed.length) store.setMeta('lastTriage', String(Date.now()));
       await notifier.notifyReplies(analysed);
+      await notifier.notifyReminders(reminders);
       const unsub = analysed.length ? await autoUnsubscribe(g, store, analysed, await g.profileEmail()) : [];
       if (unsub.length) log(`[auto] désabonné de : ${unsub.join(', ')}`);
       // Daily backup of the whole database.
