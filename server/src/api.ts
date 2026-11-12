@@ -22,7 +22,7 @@ import type { Archive } from './archive.ts';
 import { EARLY, openReminders } from './reminders.ts';
 import { openLogos } from './logos.ts';
 import { searchPlaces } from './places.ts';
-import { departure, routeMinutes, validPoint } from './travel.ts';
+import { departure, MAX_PARKING_MIN, PARKING_MIN, routeMinutes, validPoint } from './travel.ts';
 import { openUsage } from './usage.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
@@ -819,7 +819,9 @@ export function createApp(d: Deps) {
     const b = await c.req.json().catch(() => null);
     const to = typeof b?.to === 'string' ? b.to.trim().slice(0, 300) : '';
     const start = typeof b?.start === 'string' ? Date.parse(b.start) : NaN;
+    const parking = b?.parkingMin === undefined ? PARKING_MIN : b.parkingMin;
     if (!validPoint(b?.from) || !to || !Number.isFinite(start)) return c.json({ error: 'Position, lieu ou heure manquant.' }, 400);
+    if (!Number.isInteger(parking) || parking < 0 || parking > MAX_PARKING_MIN) return c.json({ error: 'Temps pour se garer : de 0 à 20 min.' }, 400);
     let dest;
     try {
       dest = (await searchPlaces(to, d.fetchImpl ?? fetch)).find((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
@@ -829,7 +831,7 @@ export function createApp(d: Deps) {
     if (!dest) return c.json({ error: 'Lieu introuvable : précise l’adresse du rendez-vous.' }, 404);
     try {
       const route = await routeMinutes({ lat: b.from.lat, lon: b.from.lon }, dest, d.fetchImpl ?? fetch);
-      return c.json({ ...departure(start, route.minutes), km: Math.round(route.km * 10) / 10, place: dest.label });
+      return c.json({ ...departure(start, route.minutes, parking), routeMin: route.minutes, km: Math.round(route.km * 10) / 10, place: dest.label });
     } catch {
       return c.json({ error: 'Calcul d’itinéraire indisponible pour le moment.' }, 502);
     }

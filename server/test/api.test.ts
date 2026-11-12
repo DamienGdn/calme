@@ -961,10 +961,18 @@ describe('when to leave', () => {
     const res = await ask(app, { from: { lat: 48.11, lon: -1.68 }, to: 'Leroy Merlin Betton', start: '2026-11-20T14:00:00+01:00' });
     expect(res.status).toBe(200);
     // 23 min drive + 5 margin + 10 parking = 38 min before 14:00 → 13:22 → 13:20
-    expect(await res.json()).toEqual({ leaveAt: new Date('2026-11-20T13:20:00+01:00').getTime(), driveMin: 23, marginMin: 5, parkingMin: 10, km: 12.3, place: 'Leroy Merlin, Rue de la Maison Neuve, 35830 Betton' });
+    expect(await res.json()).toEqual({ leaveAt: new Date('2026-11-20T13:20:00+01:00').getTime(), driveMin: 23, marginMin: 5, parkingMin: 10, routeMin: 22.4, km: 12.3, place: 'Leroy Merlin, Rue de la Maison Neuve, 35830 Betton' });
     const route = new URL(fetched.find((f) => f.url.includes('itineraire'))!.url);
     expect(route.searchParams.get('start')).toBe('-1.68,48.11');
     expect(route.searchParams.get('end')).toBe('-1.63,48.16');
+  });
+
+  it('takes the time to park chosen for the appointment, from 0 to 20 min', async () => {
+    const { app } = setup();
+    const res = await ask(app, { from: { lat: 48.11, lon: -1.68 }, to: 'Leroy Merlin Betton', start: '2026-11-20T14:00:00+01:00', parkingMin: 0 });
+    // 23 + 5 + 0 = 28 min before 14:00 → 13:32 → 13:30
+    expect(await res.json()).toMatchObject({ parkingMin: 0, leaveAt: new Date('2026-11-20T13:30:00+01:00').getTime() });
+    expect((await ask(app, { from: { lat: 48.11, lon: -1.68 }, to: 'Betton', start: '2026-11-20T14:00:00+01:00', parkingMin: 45 })).status).toBe(400);
   });
 
   it('refuses a missing position, place or start', async () => {

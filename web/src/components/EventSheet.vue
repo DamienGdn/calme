@@ -3,7 +3,9 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { dateLocale } from '../i18n.ts';
 import { post } from '../api.ts';
+import { departure } from '../../../server/src/travel.ts';
 import { directionsUrl, mapsUrl } from '../maps.ts';
+import { PARKING_CHOICES, parkingFor, setParking } from '../parking.ts';
 import { currentPosition, here, positionState } from '../position.ts';
 import { useSheetDrag } from '../sheetDrag.ts';
 import Icon from './Icon.vue';
@@ -48,8 +50,16 @@ const when = computed(() => {
 const mapUrl = computed(() => mapsUrl(props.event.location ?? ''));
 
 // --- When to leave: from where the user is now, by car, with a traffic margin and time to park (server/src/travel.ts).
-interface Leave { leaveAt: number; driveMin: number; marginMin: number; parkingMin: number; km: number; place: string }
+interface Leave { routeMin: number; km: number; place: string }
 const leave = ref<Leave | null>(null);
+// Time to park, chosen per appointment (0–20 min): the departure is recomputed at once, the route is not asked again.
+const parkKey = props.event.id ?? `${props.event.title}|${props.event.start}`;
+const parking = ref(parkingFor(parkKey));
+function chooseParking(min: number) {
+  parking.value = min;
+  setParking(parkKey, min);
+}
+const plan = computed(() => (leave.value ? departure(Date.parse(props.event.start), leave.value.routeMin, parking.value) : null));
 const leaveState = ref<'idle' | 'locating' | 'error'>('idle');
 const leaveError = ref('');
 /** Timed appointments with a place, from now to a week ahead. */
@@ -59,14 +69,14 @@ const canLeave = computed(() => {
   return Boolean(!e.allDay && e.location?.trim() && start > Date.now() && start - Date.now() < 7 * 86400_000);
 });
 const hm = (ts: number) => new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
-const late = computed(() => Boolean(leave.value && leave.value.leaveAt <= Date.now()));
+const late = computed(() => Boolean(plan.value && plan.value.leaveAt <= Date.now()));
 async function whenToLeave() {
   leaveState.value = 'locating';
   try {
     const from = await currentPosition().catch(() => {
       throw new Error(t('agenda.leave.noPos'));
     });
-    leave.value = await post<Leave>('/api/travel', { from, to: props.event.location, start: props.event.start });
+    leave.value = await post<Leave>('/api/travel', { from, to: props.event.location, start: props.event.start, parkingMin: parking.value });
     leaveState.value = 'idle';
   } catch (e) {
     leaveError.value = (e as Error).message;
@@ -100,9 +110,16 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         <a :href="mapUrl" target="_blank" rel="noopener noreferrer">{{ t('agenda.form.seeMap') }} ↗</a>
       </p>
       <section v-if="canLeave" class="ev-leave" :aria-label="t('agenda.leave.ask')" aria-live="polite">
-        <template v-if="leave">
-          <p :class="['ev-leave-at', { late }]"><Icon name="clock" :size="18" /> {{ late ? t('agenda.leave.late', { time: hm(leave.leaveAt) }) : t('agenda.leave.at', { time: hm(leave.leaveAt) }) }}</p>
-          <p class="muted ev-leave-detail">{{ t('agenda.leave.detail', { drive: leave.driveMin, km: leave.km.toLocaleString(dateLocale()), margin: leave.marginMin, park: leave.parkingMin }) }}</p>
+        <template v-if="leave && plan">
+          <p :class="['ev-leave-at', { late }]"><Icon name="clock" :size="18" /> {{ late ? t('agenda.leave.late', { time: hm(plan.leaveAt) }) : t('agenda.leave.at', { time: hm(plan.leaveAt) }) }}</p>
+          <p class="muted ev-leave-detail">{{ t('agenda.leave.detail', { drive: plan.driveMin, km: leave.km.toLocaleString(dateLocale()), margin: plan.marginMin, park: plan.parkingMin }) }}</p>
+          <div class="ev-park" role="radiogroup" :aria-label="t('agenda.leave.park')">
+            <span class="eyebrow">{{ t('agenda.leave.park') }}</span>
+            <span class="ev-park-choices">
+              <button v-for="m in PARKING_CHOICES" :key="m" type="button" role="radio" :aria-checked="parking === m" :class="{ on: parking === m }" @click="chooseParking(m)">{{ m }}</button>
+              <span class="muted" style="font-size: 12px">min</span>
+            </span>
+          </div>
           <span style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
             <a class="btn" :href="directionsUrl(leave.place)" target="_blank" rel="noopener noreferrer"><Icon name="pin" :size="16" /> {{ t('agenda.leave.route') }}</a>
             <button type="button" class="btn" @click="whenToLeave"><Icon name="refresh" :size="16" /> {{ t('agenda.leave.again') }}</button>

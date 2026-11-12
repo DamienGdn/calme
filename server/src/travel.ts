@@ -13,8 +13,9 @@ export interface Departure {
   parkingMin: number;
 }
 
-/** Minutes to find a spot and walk from the car. */
+/** Minutes to find a spot and walk from the car, by default; each appointment can set 0 to 20. */
 export const PARKING_MIN = 10;
+export const MAX_PARKING_MIN = 20;
 
 export function departure(start: number, routeMin: number, parkingMin = PARKING_MIN): Departure {
   const driveMin = Math.ceil(routeMin - 0.01); // 44.9 → 45, 6 → 6
