@@ -29,11 +29,13 @@ export function createNotifier(
   const sender: PushSender =
     send ?? ((sub, payload) => sendNotification(sub, payload, { vapidDetails: { subject, ...vapid }, TTL: 3600 }));
 
+  /** Each push also carries the number of unread mails, shown on the app icon (iPhone home screen). */
   async function push(payloads: { title: string; body: string; url: string }[]) {
+    const badge = s.listInbox().filter((m) => m.labelIds?.includes('UNREAD')).length;
     for (const sub of s.listPushSubs()) {
       for (const p of payloads) {
         try {
-          await sender(sub, JSON.stringify(p));
+          await sender(sub, JSON.stringify({ ...p, badge }));
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
           if (code === 404 || code === 410) {

@@ -27,6 +27,8 @@ export interface GmailPort {
   send(raw: string, threadId?: string): Promise<void>;
   listLabels(): Promise<{ id: string; name: string }[]>;
   profileEmail(): Promise<string>;
+  /** The name mails are sent under (main address), '' when none is set. */
+  displayName(): Promise<string>;
 }
 
 export class GmailDisconnected extends Error {
@@ -182,6 +184,11 @@ export function createGmailPort(auth: OAuth2Client, background = false): GmailPo
         .filter((l) => l.type === 'user' && l.id && l.name)
         .map((l) => ({ id: l.id as string, name: l.name as string }))
         .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    },
+    async displayName() {
+      const res = await call(COST.list, () => users.settings.sendAs.list({ userId: 'me' }));
+      const all = res.data.sendAs ?? [];
+      return (all.find((a) => a.isPrimary) ?? all.find((a) => a.isDefault) ?? all[0])?.displayName ?? '';
     },
     async profileEmail() {
       return (await call(COST.profile, () => users.getProfile({ userId: 'me' }))).data.emailAddress ?? '';

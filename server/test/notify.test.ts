@@ -26,7 +26,7 @@ describe('notifier', () => {
     hour = 9;
     await n.notifyReminders(r);
     await n.notifyReminders(r);
-    expect(sent.map((p) => JSON.parse(p))).toEqual([{ title: 'Rappel', body: 'Compteur de chantier', url: '/#/rappels' }]);
+    expect(sent.map((p) => JSON.parse(p))).toEqual([{ title: 'Rappel', body: 'Compteur de chantier', url: '/#/rappels', badge: 0 }]);
   });
 
 
@@ -40,7 +40,7 @@ describe('notifier', () => {
     });
     await n.notifyReplies([reply('a'), { ...reply('x'), category: 'news' }]);
     expect(sent).toHaveLength(1);
-    expect(JSON.parse(sent[0])).toMatchObject({ title: 'Sophie Martin', body: 'Dîner samedi ?' });
+    expect(JSON.parse(sent[0])).toMatchObject({ title: 'Sophie Martin', body: 'Dîner samedi ?', badge: 0 });
   });
 
   it('groups more than 3 replies into a single push', async () => {

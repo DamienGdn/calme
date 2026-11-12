@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isoWeek } from '../src/dates.ts';
+import { farDate, isoWeek } from '../src/dates.ts';
 
 const at = (s: string) => new Date(`${s}T12:00:00`);
 
@@ -19,4 +19,11 @@ test('the first days of January can belong to the last week of the year before',
 test('the last days of December can belong to week 1 of the year after', () => {
   assert.equal(isoWeek(at('2025-12-29')), 1);
   assert.equal(isoWeek(at('2025-12-28')), 52);
+});
+
+test('an older mail shows its day in short, the date and the month; the year only when it is not this year', () => {
+  const now = new Date(2026, 10, 12, 10);
+  assert.equal(farDate(new Date(2026, 10, 4, 9).getTime(), now, 'fr-FR'), 'mer. 4 nov.');
+  assert.equal(farDate(new Date(2025, 11, 30, 9).getTime(), now, 'fr-FR'), 'mar. 30 déc. 2025');
+  assert.equal(farDate(new Date(2026, 10, 4, 9).getTime(), now, 'en-GB'), 'Wed 4 Nov');
 });

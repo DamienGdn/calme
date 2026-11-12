@@ -95,6 +95,9 @@ export function fakeGmail(ids: string[] = []) {
     async listLabels() {
       return [{ id: 'Label_1', name: 'Factures' }];
     },
+    async displayName() {
+      return 'Camille Test';
+    },
     async profileEmail() {
       return 'moi@x.fr';
     },

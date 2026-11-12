@@ -80,6 +80,7 @@ export const notifyError = (e: unknown) => notify((e as Error).message, true);
 export async function refresh() {
   try {
     store.state = await api<AppState>('/api/state');
+    showBadge(store.state.emails.filter(isUnread).length);
   } catch (e) {
     if (e instanceof Unauthorized) {
       setToken(null);
@@ -103,6 +104,12 @@ export async function setRead(ids: string[], read: boolean) {
     for (const m of mails) m.labelIds = before.get(m.id) ?? m.labelIds;
     notifyError(e);
   }
+}
+
+/** Unread mails on the app icon (home-screen app; ignored where the Badging API is missing). */
+function showBadge(n: number) {
+  const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+  void (n > 0 ? nav.setAppBadge?.(n) : nav.clearAppBadge?.())?.catch(() => {});
 }
 
 export type ThemePref = 'system' | 'light' | 'dark';

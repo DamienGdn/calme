@@ -249,6 +249,11 @@ describe('api actions', () => {
     expect(asked).toHaveLength(2);
   });
 
+  it('gives the account shown in the menu: name and address', async () => {
+    const { app } = setup();
+    expect(await (await app.request('/api/account', { headers: auth })).json()).toEqual({ email: 'moi@x.fr', name: 'Camille Test' });
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

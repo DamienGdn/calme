@@ -1,5 +1,6 @@
 import { ref, watch, type Ref } from 'vue';
 import type { Category, MailView } from '../../server/src/types.ts';
+import { farDate } from './dates.ts';
 import { dateLocale, i18n } from './i18n.ts';
 
 export type { Category, MailView };
@@ -122,7 +123,7 @@ export function when(ts: number): string {
   y.setDate(now.getDate() - 1);
   if (d.toDateString() === y.toDateString()) return i18n.global.t('common.yesterday');
   if (now.getTime() - ts < 6 * 86400_000) return d.toLocaleDateString(loc, { weekday: 'short' });
-  return d.toLocaleDateString(loc, { day: 'numeric', month: 'short' });
+  return farDate(ts, now, loc);
 }
 
 /** Full text of a mail, loaded when it is opened (the list only carries headers). */

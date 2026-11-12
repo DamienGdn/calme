@@ -229,6 +229,14 @@ export function createApp(d: Deps) {
 
   app.get('/api/quota', (c) => c.json(quotaUsage()));
 
+  // Who is signed in, for the menu: the Gmail address and the name mails go out under (asked once).
+  let account: { email: string; name: string } | null = null;
+  app.get('/api/account', async (c) => {
+    if (!d.gmail()) return c.json({ email: null, name: null });
+    account ??= { email: await myEmail(), name: await gmail().displayName().catch(() => '') };
+    return c.json(account);
+  });
+
   // --- First-run setup wizard ---
   app.get('/api/setup', async (c) => {
     const connected = Boolean(d.oauth.hasCredentials() && d.oauth.isConnected() && d.gmail());

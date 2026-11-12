@@ -990,3 +990,52 @@ html.kb-open .fab { display: none; }
 .search-ev .muted { grid-column: 2 / 4; font-size: 13px; }
 .search-ev.past { opacity: 0.6; }
 @media (max-width: 720px) { .search-ev { grid-template-columns: 10px minmax(0, 1fr); } .search-ev-title, .search-ev .muted { grid-column: 2; } }
+
+/* ---------- Phone menu bar, iOS style (Apple Music): light liquid glass, a sliding lens on the selected tab, and
+   shrunk to the current tab plus a search button while scrolling down. The light (rim, bevel, fringe) is drawn
+   in WebGL by GlassLayer.vue; the backdrop stays CSS. ---------- */
+.appbar, .orb { display: none; }
+@media (max-width: 720px) {
+  .tabbar { height: 64px; padding: 6px; transition: right 0.42s cubic-bezier(0.3, 1.25, 0.5, 1); }
+  .tabbar.mini { right: calc(100% - 12px - 64px); }
+  .glass-layer { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; pointer-events: none; z-index: 0; }
+  .tab-pill { position: absolute; left: 0; top: 0; border-radius: 999px; z-index: 0; pointer-events: none;
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+    transition: transform 0.42s cubic-bezier(0.3, 1.3, 0.5, 1), width 0.42s cubic-bezier(0.3, 1.3, 0.5, 1), opacity 0.2s; }
+  .tabbar a { z-index: 1; flex: 1 1 0; min-width: 0; height: 52px; gap: 2px; font-size: 10px; letter-spacing: 0.01em; color: var(--ink); text-shadow: none;
+    transition: flex-grow 0.42s cubic-bezier(0.3, 1.25, 0.5, 1), opacity 0.25s; }
+  .tabbar a[aria-current='page'] { background: transparent; box-shadow: none; color: var(--accent-text); font-weight: 600; }
+  [data-theme='dark'] .tabbar a[aria-current='page'] { color: var(--accent); }
+  .tabbar a:not([aria-current='page']) { text-shadow: none; color: var(--ink); }
+  .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; transition: opacity 0.2s; }
+  .tabbar.mini a:not([aria-current='page']) { flex-grow: 0; opacity: 0; pointer-events: none; padding: 0; overflow: hidden; }
+  .tabbar.mini .tab-label { opacity: 0; height: 0; }
+  .tabbar.mini a[aria-current='page'] { gap: 0; }
+
+  .orb { display: grid; place-items: center; position: fixed; right: 12px; bottom: var(--bar-bottom); z-index: 20; width: 64px; height: 64px; border-radius: 50%; color: var(--ink); isolation: isolate; box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5); animation: orb-in 0.35s cubic-bezier(0.3, 1.3, 0.5, 1) both; }
+  .orb::before, .orb::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; }
+  .orb::before { -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 3 + 4px)) saturate(180%); backdrop-filter: blur(calc(var(--glass-blur) * 3 + 4px)) saturate(180%); }
+  .orb::after { background: color-mix(in srgb, #09090b var(--glass-tint), transparent); }
+  [data-theme='light'] .orb::after { background: color-mix(in srgb, #fafafa var(--glass-tint), transparent); }
+  .orb svg { position: relative; z-index: 1; }
+  @keyframes orb-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+  .main:has(.selbar) ~ .orb { display: none; }
+
+  /* Top band: the app's name and the menu (settings, reminders, version). */
+  :root { --top-band: calc(env(safe-area-inset-top) + 50px); }
+  .appbar { display: flex; position: fixed; inset: 0 0 auto 0; z-index: 41; height: var(--top-band); align-items: flex-end; justify-content: space-between; padding: 0 10px 4px 18px; background: var(--bg); }
+  .appbar-brand { font-family: 'Fraunces', Georgia, serif; font-size: 22px; line-height: 40px; letter-spacing: -0.01em; }
+  .appbar-menu { width: 44px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 12px; background: transparent; color: var(--ink); -webkit-app-region: no-drag; }
+  .appbar-menu[aria-expanded='true'] { background: var(--surf2); }
+  .appmenu-backdrop { position: fixed; inset: 0; z-index: 75; background: color-mix(in srgb, #000 30%, transparent); }
+  .appmenu { position: absolute; top: calc(var(--top-band) + 6px); right: 10px; width: min(300px, calc(100vw - 20px)); display: flex; flex-direction: column; padding: 8px; border-radius: 22px; background: var(--surf); border: 1px solid var(--line); box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.6); }
+  .appmenu-who { display: flex; align-items: center; gap: 12px; padding: 10px 10px 14px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .appmenu-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--prim-bg); color: var(--prim-fg); font-family: 'Fraunces', Georgia, serif; font-size: 20px; }
+  .appmenu-id { display: flex; flex-direction: column; min-width: 0; font-size: 15px; }
+  .appmenu-id .muted { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .appmenu-item { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 10px; border-radius: 12px; color: var(--ink); text-decoration: none; font-size: 15px; }
+  .appmenu-item:active { background: var(--surf2); }
+  .appmenu-item .grow { flex: 1; }
+  .appmenu-version { padding: 10px 10px 4px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); margin-top: 6px; }
+}
+@media (max-width: 720px) { [data-desktop='mac'] .appbar { padding-left: 84px; } }

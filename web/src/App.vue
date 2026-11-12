@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, CAT_COLOR, type Category } from './api.ts';
+import GlassLayer from './components/GlassLayer.vue';
 import Icon, { type IconName } from './components/Icon.vue';
 import PairRequests from './components/PairRequests.vue';
 import QuotaGauge from './components/QuotaGauge.vue';
@@ -36,6 +37,7 @@ watch(tabbarEl, (el) => {
     const w = Math.round(el.offsetWidth);
     const h = Math.round(el.offsetHeight);
     if (w !== barSize.value.w || h !== barSize.value.h) barSize.value = { w, h };
+    placePill();
   });
   glassObserver.observe(el);
 });
@@ -56,10 +58,16 @@ let poll = 0;
 const onFocus = () => void refresh();
 onMounted(() => {
   window.addEventListener('hashchange', onHash);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('keydown', onMenuKey);
+  window.addEventListener('resize', placePill);
   void registerWorker();
 });
 onBeforeUnmount(() => {
   window.removeEventListener('hashchange', onHash);
+  window.removeEventListener('scroll', onScroll);
+  window.removeEventListener('keydown', onMenuKey);
+  window.removeEventListener('resize', placePill);
   window.removeEventListener('focus', onFocus);
   window.clearInterval(poll);
 });
@@ -108,7 +116,12 @@ const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders'];
 const scrolls = new Map<string, number>();
 watch(loc, (to, from) => {
   scrolls.set(`${from.route}/${from.arg}`, window.scrollY);
-  void nextTick(() => window.scrollTo({ top: scrolls.get(`${to.route}/${to.arg}`) ?? 0 }));
+  menuOpen.value = false;
+  void nextTick(() => {
+    window.scrollTo({ top: scrolls.get(`${to.route}/${to.arg}`) ?? 0 });
+    lastY = window.scrollY;
+    mini.value = false;
+  });
 });
 
 const route = computed<Route>(() => loc.value.route);
@@ -122,12 +135,49 @@ const tools: { r: Route; label: string; icon: IconName }[] = [
   { r: 'rappels', label: 'nav.reminders', icon: 'clock' },
 ];
 const tabs: [Route, string, IconName][] = [
-  ['tri', 'nav.triage', 'sort'],
+  ['tri', 'nav.mail', 'mail'],
   ['menage', 'nav.cleanup', 'trash'],
   ['agenda', 'nav.agenda', 'calendar'],
   ['dossiers', 'nav.folders', 'folder'],
-  ['admin', 'nav.admin', 'gear'],
+  ['recherche', 'nav.searchTab', 'search'],
 ];
+const onTab = computed(() => tabs.some(([r]) => r === route.value));
+
+// Phone menu bar, like iOS: scrolling down shrinks it to the current tab and a search button; scrolling up (or
+// changing page) brings it back. The selected tab's pill is one element that slides, so the glass can follow it.
+const mini = ref(false);
+let lastY = 0;
+function onScroll() {
+  const y = window.scrollY;
+  if (Math.abs(y - lastY) < 10) return;
+  mini.value = y > lastY && y > 90;
+  lastY = y;
+}
+const tabEls = ref<HTMLElement[]>([]);
+const pillEl = ref<HTMLElement | null>(null);
+const pillBox = ref({ x: 0, y: 0, w: 0, h: 0 });
+const pillMoves = ref(0);
+function placePill() {
+  const i = tabs.findIndex(([r]) => r === route.value);
+  const el = i >= 0 ? tabEls.value[i] : null;
+  pillBox.value = el ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight } : { x: 0, y: 0, w: 0, h: 0 };
+  pillMoves.value++;
+}
+watch([route, mini], () => void nextTick(placePill));
+const dark = computed(() => store.theme === 'dark');
+
+// Top menu (phone): who is signed in, settings, reminders, version.
+const menuOpen = ref(false);
+const account = ref<{ email: string | null; name: string | null } | null>(null);
+watch(
+  () => store.state?.gmail,
+  (g) => {
+    if (g === 'connected' && !account.value) api<{ email: string | null; name: string | null }>('/api/account').then((a) => (account.value = a)).catch(() => {});
+  },
+  { immediate: true },
+);
+const initial = computed(() => (account.value?.name || account.value?.email || 'C').trim().charAt(0).toUpperCase());
+const onMenuKey = (e: KeyboardEvent) => e.key === 'Escape' && (menuOpen.value = false);
 const depth = (name: string) => name.split('/').length - 1;
 </script>
 
@@ -206,9 +256,36 @@ const depth = (name: string) => name.split('/').length - 1;
 
     <button v-if="['tri', 'dossiers', 'recherche'].includes(route)" type="button" class="fab" @click="openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>
 
-    <nav ref="tabbarEl" class="tabbar" :style="glassStyle" :aria-label="t('nav.tabs')">
-      <a v-for="[r, label, icon] in tabs" :key="r" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined"><Icon :name="icon" /> {{ t(label) }}</a>
+    <header class="appbar">
+      <span class="appbar-brand">Calm<span class="wordmark-dot">.</span></span>
+      <button type="button" class="appbar-menu" :aria-label="t('nav.menu')" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><Icon name="menu" :size="20" /></button>
+    </header>
+    <div v-if="menuOpen" class="appmenu-backdrop" @click.self="menuOpen = false">
+      <nav class="appmenu rise" :aria-label="t('nav.menu')">
+        <div class="appmenu-who">
+          <span class="appmenu-avatar" aria-hidden="true">{{ initial }}</span>
+          <span class="appmenu-id">
+            <b>{{ account?.name || account?.email || 'Calm' }}</b>
+            <span v-if="account?.email && account?.name" class="muted">{{ account.email }}</span>
+          </span>
+        </div>
+        <a href="#/admin" class="appmenu-item"><Icon name="gear" :size="18" /> <span class="grow">{{ t('nav.settings') }}</span><span class="dot" :style="{ background: healthy ? 'var(--accent)' : 'var(--hot)' }" aria-hidden="true" /></a>
+        <a href="#/rappels" class="appmenu-item"><Icon name="clock" :size="18" /> <span class="grow">{{ t('nav.reminders') }}</span></a>
+        <a href="#/desabonnements" class="appmenu-item"><Icon name="unsub" :size="18" /> <span class="grow">{{ t('nav.unsubscribe') }}</span></a>
+        <a href="#/ecrire" class="appmenu-item" @click="draft = {}"><Icon name="pen" :size="18" /> <span class="grow">{{ t('nav.newMessage') }}</span></a>
+        <span class="appmenu-version mono">Calm {{ version }}</span>
+      </nav>
+    </div>
+
+    <nav ref="tabbarEl" :class="['tabbar', { mini: mini && onTab }]" :style="glassStyle" :aria-label="t('nav.tabs')">
+      <GlassLayer :pill="pillEl" :dark="dark" :moving="pillMoves" />
+      <span ref="pillEl" class="tab-pill" aria-hidden="true" :style="{ transform: `translate(${pillBox.x}px, ${pillBox.y}px)`, width: `${pillBox.w}px`, height: `${pillBox.h}px`, opacity: pillBox.w ? 1 : 0 }" />
+      <a v-for="[r, label, icon] in tabs" :key="r" ref="tabEls" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined"><Icon :name="icon" :size="22" /> <span class="tab-label">{{ t(label) }}</span></a>
     </nav>
+    <a v-if="mini && onTab && route !== 'recherche'" href="#/recherche" class="orb" :aria-label="t('nav.searchTab')">
+      <GlassLayer :dark="dark" />
+      <Icon name="search" :size="22" />
+    </a>
 
     <PairRequests v-if="onComputer" />
     <div v-if="store.toast" :class="['toast', { err: store.toast.err }]" role="status">
