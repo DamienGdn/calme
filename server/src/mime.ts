@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { safeMailHtml } from './mailHtml.ts';
 import type { gmail_v1 } from '@googleapis/gmail';
 import type { MailMessage, Unsub } from './types.ts';
 
@@ -156,6 +157,8 @@ export interface OutgoingMail {
   body: string;
   inReplyTo?: string;
   references?: string;
+  /** Appended after "-- ": Calm's light markup, or HTML (cleaned here, sent as it is and as text). */
+  signature?: string;
   attachments: OutgoingAttachment[];
 }
 
@@ -170,27 +173,49 @@ function safe(value: string): string {
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const BOLD = /\*\*([^*\n]+?)\*\*/g;
 
+const inline = (p: string) =>
+  escHtml(p)
+    .replace(BOLD, '<strong>$1</strong>')
+    .replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]]/g, (u) => `<a href="${u}">${u}</a>`)
+    .replace(/\n/g, '<br>');
+const paragraphs = (src: string) =>
+  src
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${inline(p)}</p>`)
+    .join('');
+
+/** A signature holding tags is HTML (Gmail's, or pasted); anything else is Calm's light markup. */
+export const isHtmlSignature = (sig: string) => /<[a-z][^>]*>/i.test(sig);
+
+/** The signature as the two versions of a mail: HTML is cleaned like any mail HTML, markup is formatted. */
+export function signatureParts(sig: string): { text: string; html: string } {
+  const src = sig.replace(/\r\n/g, '\n').trim();
+  if (isHtmlSignature(src)) {
+    const html = safeMailHtml(src);
+    return { text: htmlToText(html).trim(), html };
+  }
+  return { text: src.replace(BOLD, '$1'), html: paragraphs(src) };
+}
+
 /**
  * Calm's light markup (paragraphs separated by a blank line, **bold**, bare links) as the two versions of a mail:
  * plain text without the stars, and HTML where every character of the text is escaped first.
  */
-export function formatBody(src: string): { text: string; html: string } {
+export function formatBody(src: string, signature?: string): { text: string; html: string } {
   const body = src.replace(/\r\n/g, '\n');
-  const text = body.replace(BOLD, '$1');
-  const inline = (p: string) =>
-    escHtml(p)
-      .replace(BOLD, '<strong>$1</strong>')
-      .replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]]/g, (u) => `<a href="${u}">${u}</a>`)
-      .replace(/\n/g, '<br>');
-  const paras = body.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1b1b1f">${paras.map((p) => `<p>${inline(p)}</p>`).join('')}</div>`;
+  const sig = signature?.trim() ? signatureParts(signature) : null;
+  const text = body.replace(BOLD, '$1') + (sig ? `\n\n-- \n${sig.text}` : '');
+  const sigHtml = sig ? `<div style="margin-top:18px;color:#55555c">-- <br>${sig.html}</div>` : '';
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#1b1b1f">${paragraphs(body)}${sigHtml}</div>`;
   return { text, html };
 }
 
 export function buildMime(o: OutgoingMail): string {
   const boundary = 'calme-' + randomBytes(12).toString('hex');
   const alt = 'calme-alt-' + randomBytes(12).toString('hex');
-  const { text, html } = formatBody(o.body);
+  const { text, html } = formatBody(o.body, o.signature);
   const headers = [
     `From: ${safe(o.from)}`,
     `To: ${safe(o.to)}`,

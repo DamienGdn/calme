@@ -10,7 +10,7 @@ import { GmailDisconnected, type GmailPort } from './gmail.ts';
 import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
 import { safeMailHtml } from './mailHtml.ts';
-import { decodeEntities, htmlToText, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
+import { decodeEntities, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
@@ -398,7 +398,7 @@ export function createApp(d: Deps) {
           to: field('to'),
           cc: field('cc'),
           subject: field('subject'),
-          body: signed(field('body')),
+          ...signed(field('body')),
           attachments: await Promise.all(
             files.map(async (f) => ({ filename: f.name, mimeType: f.type || 'application/octet-stream', data: Buffer.from(await f.arrayBuffer()) })),
           ),
@@ -410,18 +410,14 @@ export function createApp(d: Deps) {
   );
 
   // The signature (Admin › Signature), when on, takes the place of the "[Prénom]" placeholder Calm's drafts end with.
-  const signed = (body: string) => {
+  const signed = (body: string): { body: string; signature?: string } => {
     const { signature, signatureOn } = getSettings(store, defaults());
-    if (!signatureOn || !signature.trim()) return body;
-    return `${body.replace(/\s*\[(?:Prénom|First name)\]\s*$/, '').trimEnd()}\n\n-- \n${signature.trim()}`;
+    if (!signatureOn || !signature.trim()) return { body };
+    return { body: body.replace(/\s*\[(?:Prénom|First name)\]\s*$/, '').trimEnd(), signature };
   };
 
-  // Imports the signature set in Gmail, as Calm's light markup (bold kept, lines kept).
-  app.get('/api/signature/gmail', async (c) => {
-    const html = await gmail().signature();
-    const marked = html.replace(/<(b|strong)\b[^>]*>([\s\S]*?)<\/\1>/gi, '**$2**');
-    return c.json({ text: htmlToText(marked).trim() });
-  });
+  // Imports the signature set in Gmail as it is, in HTML (cleaned again whenever a mail is sent).
+  app.get('/api/signature/gmail', async (c) => c.json({ html: safeMailHtml(await gmail().signature()).trim() }));
 
   // Questions on what a reply draft leaves unknown; the answers then go to /api/redraft as an instruction.
   app.post('/api/reply/questions', async (c) => {

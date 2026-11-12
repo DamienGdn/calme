@@ -44,6 +44,7 @@ export interface ReplyInput {
   cc?: string;
   subject: string;
   body: string;
+  signature?: string;
   attachments: OutgoingAttachment[];
 }
 
@@ -56,6 +57,7 @@ export async function sendReply(g: GmailPort, s: Store, i: ReplyInput, fromEmail
     cc: i.cc,
     subject: i.subject,
     body: i.body,
+    signature: i.signature,
     inReplyTo: orig?.messageIdHeader || undefined,
     references: orig ? [orig.references, orig.messageIdHeader].filter(Boolean).join(' ') || undefined : undefined,
     attachments: i.attachments,

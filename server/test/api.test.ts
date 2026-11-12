@@ -819,10 +819,24 @@ describe('email signature', () => {
     expect(part(sentRaw(g), 'text/plain')).toBe('Merci\n[Prénom]');
   });
 
-  it('imports the Gmail signature as text', async () => {
+  it('imports the Gmail signature as it is, in HTML', async () => {
     const { app } = setup();
     const r = await (await app.request('/api/signature/gmail', { headers: auth })).json();
-    expect(r.text).toBe('Damien Guesdon\n**Calm.**');
+    expect(r.html).toBe('<div dir="ltr">Damien Guesdon<br><b>Calm.</b></div>');
+  });
+
+  it('sends an HTML signature as HTML (cleaned) and as text', async () => {
+    const { app, g } = setup();
+    const sig = '<table><tr><td><b>Damien Guesdon</b><br><a href="https://calm.example">calm.example</a><img src="https://calm.example/logo.png" width="80"></td></tr></table><script>steal()</script>';
+    expect((await save(app, { signature: sig, signatureOn: true })).status).toBe(200);
+    await send(app, 'Merci !\n[Prénom]');
+    const raw = sentRaw(g);
+    const html = part(raw, 'text/html');
+    expect(html).toContain('<img src="https://calm.example/logo.png" width="80">');
+    expect(html).toContain('<a href="https://calm.example">calm.example</a>');
+    expect(html).not.toContain('<script');
+    expect(html).not.toContain('**');
+    expect(part(raw, 'text/plain')).toContain('Merci !\n\n-- \nDamien Guesdon');
   });
 });
 

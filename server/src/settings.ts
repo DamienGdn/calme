@@ -22,7 +22,7 @@ export interface Settings {
   quietEnd: number | null;
   /** Load the images of formatted mails (some senders use them to know a mail was opened). */
   remoteImages: boolean;
-  /** Email signature, in Calm's light markup (lines, **bold**, links), and whether it is added when sending. */
+  /** Email signature, in Calm's light markup (lines, **bold**, links) or in HTML, and whether it is added when sending. */
   signature: string;
   signatureOn: boolean;
   /** Calendars not shown in the agenda (ids), for every device. */
@@ -68,7 +68,7 @@ export function saveSettings(s: Store, patch: Partial<Settings>): void {
   }
   if (patch.autoUnsubscribe !== undefined) next.autoUnsubscribe = Boolean(patch.autoUnsubscribe);
   if (patch.remoteImages !== undefined) next.remoteImages = Boolean(patch.remoteImages);
-  if (patch.signature !== undefined) next.signature = String(patch.signature).replace(/\r\n/g, '\n').slice(0, 2000);
+  if (patch.signature !== undefined) next.signature = String(patch.signature).replace(/\r\n/g, '\n').slice(0, 50_000);
   if (patch.signatureOn !== undefined) next.signatureOn = Boolean(patch.signatureOn);
   if (patch.hiddenCalendars !== undefined) {
     if (!Array.isArray(patch.hiddenCalendars)) throw new Error('hiddenCalendars must be a list');

@@ -56,7 +56,7 @@ const fr = {
     import: 'Importer ma signature Gmail',
     noneInGmail: 'Aucune signature dans Gmail.',
     edit: 'Modifier la signature',
-    note: 'Ajoutée sous chaque nouveau message et chaque réponse, à la place de « [Prénom] » dans les brouillons de Calm. **texte** = gras, les liens deviennent cliquables.',
+    note: 'Ajoutée sous chaque nouveau message et chaque réponse, à la place de « [Prénom] » dans les brouillons de Calm. Texte simple (**texte** = gras, liens cliquables) ou HTML : collez le code d’un générateur de signature, ou importez celle de Gmail, logo compris.',
   },
   pairReq: {
     title: '{name} demande l’accès à Calm',
@@ -618,7 +618,7 @@ const en: Messages = {
     import: 'Import my Gmail signature',
     noneInGmail: 'No signature in Gmail.',
     edit: 'Edit the signature',
-    note: 'Added under every new message and reply, in place of “[First name]” in Calm’s drafts. **text** = bold, links become clickable.',
+    note: 'Added under every new message and reply, in place of “[First name]” in Calm’s drafts. Plain text (**text** = bold, clickable links) or HTML: paste the code from a signature generator, or import your Gmail one, logo included.',
   },
   pairReq: {
     title: '{name} is asking for access to Calm',

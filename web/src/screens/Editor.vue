@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { post, useMailBody, when } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import RecipientField from '../components/RecipientField.vue';
-import { richText } from '../format.ts';
+import SignaturePreview from '../components/SignaturePreview.vue';
 import { dateLocale } from '../i18n.ts';
 import { draft, goTo, notify, notifyError, refresh, store } from '../store.ts';
 
@@ -25,7 +25,7 @@ const subject = ref(mail.value ? (/^re\s*:/i.test(mail.value.subject) ? mail.val
 /** With a signature on, the "[Prénom]" placeholder Calm's drafts end with is not needed. */
 const unsign = (text: string) => (store.state?.signature ? text.replace(/\s*\[(?:Prénom|First name)\]\s*$/, '') : text);
 const body = ref(unsign(d.text ?? ''));
-const signature = computed(() => richText(store.state?.signature ?? ''));
+const signature = computed(() => (store.state?.signature ?? '').trim());
 const tone = ref<Tone | null>(null);
 const ask = ref('');
 const brief = ref('');
@@ -258,11 +258,7 @@ function onDrop(e: DragEvent) {
         <label class="sr" for="body">{{ t('editor.message') }}</label>
         <textarea id="body" v-model="body" :placeholder="t('editor.bodyPlaceholder')" :aria-busy="busy === 'rewrite'" />
         <p class="format-hint muted">{{ t('editor.formatHint') }}</p>
-        <div v-if="signature.length" class="sig-preview" :aria-label="t('signature.title')">
-          <span class="mono">--</span>
-          <p v-for="(para, i) in signature" :key="i"><template v-for="(s, j) in para" :key="j"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template></p>
-          <a href="#/admin" class="muted">{{ t('signature.edit') }}</a>
-        </div>
+        <SignaturePreview v-if="signature" :signature="signature"><a href="#/admin" class="muted">{{ t('signature.edit') }}</a></SignaturePreview>
       </div>
 
       <div style="padding: 8px 24px 20px; display: flex; flex-wrap: wrap; gap: 10px">

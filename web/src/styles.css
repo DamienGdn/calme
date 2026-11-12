@@ -863,6 +863,7 @@ html { font-optical-sizing: auto; }
 .sig-preview p { margin: 0; white-space: pre-line; }
 .sig-preview .mono { color: var(--muted); font-size: 12px; }
 .sig-preview a { font-size: 12px; align-self: flex-start; }
+.sig-frame { display: block; width: 100%; border: 0; border-radius: 8px; background: #fff; margin: 4px 0; }
 .letter .sig-preview { margin: 0 24px 4px; }
 .format-hint { margin: 4px 24px 10px; font-size: 12px; }
 .reply-card .q { display: flex; flex-direction: column; gap: 6px; font-family: inherit; font-size: 14px; line-height: 1.5; color: var(--body); }

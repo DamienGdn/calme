@@ -2,25 +2,24 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api } from '../api.ts';
-import { richText } from '../format.ts';
 import { notify, notifyError } from '../store.ts';
+import SignaturePreview from './SignaturePreview.vue';
 
-/** Email signature: written in Calm's light markup (lines, **bold**, links), imported from Gmail, added when sending. */
+/** Email signature: Calm's light markup (lines, **bold**, links) or HTML, imported from Gmail as it is, added when sending. */
 const props = defineProps<{ signature: string; on: boolean }>();
 const emit = defineEmits<{ save: [patch: { signature?: string; signatureOn?: boolean }] }>();
 const { t } = useI18n();
 const text = ref(props.signature);
 watch(() => props.signature, (v) => (text.value = v));
-const preview = computed(() => richText(text.value));
 const dirty = computed(() => text.value !== props.signature);
 const importing = ref(false);
 
 async function importGmail() {
   importing.value = true;
   try {
-    const r = await api<{ text: string }>('/api/signature/gmail');
-    if (!r.text) notify(t('signature.noneInGmail'));
-    else text.value = r.text;
+    const r = await api<{ html: string }>('/api/signature/gmail');
+    if (!r.html) notify(t('signature.noneInGmail'));
+    else text.value = r.html;
   } catch (e) {
     notifyError(e);
   } finally {
@@ -38,12 +37,9 @@ async function importGmail() {
     </label>
     <label class="sig-edit">
       <span class="eyebrow">{{ t('signature.text') }}</span>
-      <textarea id="sig-text" v-model="text" class="plain" rows="4" :placeholder="t('signature.placeholder')" />
+      <textarea id="sig-text" v-model="text" class="plain" rows="5" spellcheck="false" :placeholder="t('signature.placeholder')" />
     </label>
-    <div v-if="preview.length" class="sig-preview" :aria-label="t('signature.preview')">
-      <span class="mono">--</span>
-      <p v-for="(para, i) in preview" :key="i"><template v-for="(s, j) in para" :key="j"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template></p>
-    </div>
+    <SignaturePreview v-if="text.trim()" :signature="text" />
     <span style="display: flex; flex-wrap: wrap; gap: 8px">
       <button type="button" class="btn btn-prim" :disabled="!dirty" @click="emit('save', { signature: text })">{{ t('signature.save') }}</button>
       <button type="button" class="btn" :disabled="importing" @click="importGmail">{{ importing ? t('common.loading') : t('signature.import') }}</button>
