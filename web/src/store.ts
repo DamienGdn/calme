@@ -1,22 +1,33 @@
 import { reactive, ref } from 'vue';
 import { api, getToken, setToken, Unauthorized, type AppState } from './api.ts';
+import { canRefract } from './glass.ts';
 
-/** Liquid glass of the phone menu bar: refraction strength (0 = off), blur (px) and tint (% of the surface colour). */
+/**
+ * Liquid glass of the phone menu bar (see glass.ts): refraction strength (0 = off), depth of the bent rim and
+ * chromatic aberration, all in px and applied by Chromium only; blur (px) and tint (% of the glass colour) everywhere.
+ */
 export interface Glass {
-  refraction: number;
+  strength: number;
+  depth: number;
+  aberration: number;
   blur: number;
   tint: number;
 }
-export const GLASS_DEFAULT: Glass = { refraction: 28, blur: 6, tint: 42 };
-const clampGlass = (g: Partial<Glass>): Glass => ({
-  refraction: Math.min(80, Math.max(0, Number(g.refraction ?? GLASS_DEFAULT.refraction))),
-  blur: Math.min(24, Math.max(0, Number(g.blur ?? GLASS_DEFAULT.blur))),
-  tint: Math.min(90, Math.max(0, Number(g.tint ?? GLASS_DEFAULT.tint))),
-});
+export const GLASS_DEFAULT: Glass = { strength: 80, depth: 10, aberration: 4, blur: 3, tint: 45 };
+export const GLASS_MAX: Glass = { strength: 200, depth: 30, aberration: 20, blur: 20, tint: 90 };
+const clampGlass = (g: Partial<Glass>): Glass =>
+  Object.fromEntries(
+    (Object.keys(GLASS_DEFAULT) as (keyof Glass)[]).map((k) => {
+      const n = Number(g[k] ?? GLASS_DEFAULT[k]);
+      return [k, Math.min(GLASS_MAX[k], Math.max(0, Number.isFinite(n) ? n : GLASS_DEFAULT[k]))];
+    }),
+  ) as unknown as Glass;
+/** Where the settings are kept on this device (a new key: the earlier glass had other settings). */
+const GLASS_KEY = 'calme.glass.v2';
 
 function readGlass(): Glass {
   try {
-    return clampGlass(JSON.parse(localStorage.getItem('calme.glass') ?? '{}'));
+    return clampGlass(JSON.parse(localStorage.getItem(GLASS_KEY) ?? '{}'));
   } catch {
     return { ...GLASS_DEFAULT };
   }
@@ -131,13 +142,13 @@ function applyGlass() {
   const s = document.documentElement.style;
   s.setProperty('--glass-blur', `${store.glass.blur}px`);
   s.setProperty('--glass-tint', `${store.glass.tint}%`);
-  document.documentElement.classList.toggle('glass-refract', store.glass.refraction > 0);
+  document.documentElement.classList.toggle('glass-refract', canRefract(navigator.userAgent) && store.glass.strength > 0);
 }
 
 export function setGlass(patch: Partial<Glass>) {
   store.glass = clampGlass({ ...store.glass, ...patch });
   try {
-    localStorage.setItem('calme.glass', JSON.stringify(store.glass));
+    localStorage.setItem(GLASS_KEY, JSON.stringify(store.glass));
   } catch {
     /* not persisted */
   }

@@ -17,16 +17,16 @@ import Pairing from './screens/Pairing.vue';
 import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
-import { mapUrl } from './glass.ts';
+import { glassBackdrop } from './glass.ts';
 import { draft, openEditor, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
 
 const version = __APP_VERSION__;
 /** Access requests from other screens are approved only on the computer running Calm. */
 const onComputer = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
 
-// Liquid glass refraction: a displacement map the size of the menu bar, rebuilt when the bar changes size.
+// Liquid glass: the refraction filter is drawn for the menu bar's size, and redrawn when the bar or the settings change.
 const tabbarEl = ref<HTMLElement | null>(null);
-const glassBox = ref({ w: 0, h: 0, map: '' });
+const barSize = ref({ w: 0, h: 0 });
 let glassObserver: ResizeObserver | null = null;
 watch(tabbarEl, (el) => {
   glassObserver?.disconnect();
@@ -34,10 +34,13 @@ watch(tabbarEl, (el) => {
   glassObserver = new ResizeObserver(() => {
     const w = Math.round(el.offsetWidth);
     const h = Math.round(el.offsetHeight);
-    if (!w || !h || (w === glassBox.value.w && h === glassBox.value.h)) return;
-    glassBox.value = { w, h, map: mapUrl(w, h, h / 2, Math.min(22, h / 2)) };
+    if (w !== barSize.value.w || h !== barSize.value.h) barSize.value = { w, h };
   });
   glassObserver.observe(el);
+});
+const glassStyle = computed(() => {
+  const { w, h } = barSize.value;
+  return { '--glass-backdrop': glassBackdrop(w, h, h / 2, store.glass) };
 });
 onBeforeUnmount(() => glassObserver?.disconnect());
 
@@ -189,13 +192,7 @@ const depth = (name: string) => name.split('/').length - 1;
 
     <button v-if="['tri', 'dossiers', 'recherche'].includes(route)" type="button" class="fab" @click="openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>
 
-    <svg class="glass-defs" aria-hidden="true" width="0" height="0">
-      <filter id="calme-glass" filterUnits="userSpaceOnUse" x="0" y="0" :width="glassBox.w" :height="glassBox.h" color-interpolation-filters="sRGB">
-        <feImage :href="glassBox.map" x="0" y="0" :width="glassBox.w" :height="glassBox.h" preserveAspectRatio="none" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" :scale="store.glass.refraction" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
-    <nav ref="tabbarEl" class="tabbar" :aria-label="t('nav.tabs')">
+    <nav ref="tabbarEl" class="tabbar" :style="glassStyle" :aria-label="t('nav.tabs')">
       <a v-for="[r, label, icon] in tabs" :key="r" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined"><Icon :name="icon" /> {{ t(label) }}</a>
     </nav>
 

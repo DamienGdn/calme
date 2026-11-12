@@ -9,16 +9,21 @@ import NotificationsCard from '../components/NotificationsCard.vue';
 import SignatureCard from '../components/SignatureCard.vue';
 import CalendarsCard from '../components/CalendarsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
+import { canRefract } from '../glass.ts';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
-import { GLASS_DEFAULT, notify, notifyError, refresh, setGlass, setThemePref, store, type Glass, type ThemePref } from '../store.ts';
+import { GLASS_DEFAULT, GLASS_MAX, notify, notifyError, refresh, setGlass, setThemePref, store, type Glass, type ThemePref } from '../store.ts';
 
 const version = __APP_VERSION__;
 const THEMES: ThemePref[] = ['system', 'light', 'dark'];
-const GLASS_KNOBS: { key: keyof Glass; max: number; unit: string }[] = [
-  { key: 'refraction', max: 80, unit: '' },
-  { key: 'blur', max: 24, unit: ' px' },
-  { key: 'tint', max: 90, unit: ' %' },
-];
+const refracts = canRefract(navigator.userAgent);
+/** Refraction, depth and aberration only show where the browser can bend the backdrop (not on iPhone). */
+const GLASS_KNOBS = ([
+  { key: 'strength', unit: ' px', refract: true },
+  { key: 'depth', unit: ' px', refract: true },
+  { key: 'aberration', unit: ' px', refract: true },
+  { key: 'blur', unit: ' px', refract: false },
+  { key: 'tint', unit: ' %', refract: false },
+] as { key: keyof Glass; unit: string; refract: boolean }[]).filter((k) => !k.refract || refracts);
 
 interface Settings {
   autoUnsubscribe: boolean;
@@ -186,10 +191,10 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
           <span class="eyebrow">{{ t('admin.glass') }}</span>
           <label v-for="k in GLASS_KNOBS" :key="k.key" class="range">
             <span>{{ t(`admin.glassKnobs.${k.key}`) }}</span>
-            <input type="range" min="0" :max="k.max" :value="store.glass[k.key]" @input="setGlass({ [k.key]: Number(($event.target as HTMLInputElement).value) })" />
+            <input type="range" min="0" :max="GLASS_MAX[k.key]" :value="store.glass[k.key]" @input="setGlass({ [k.key]: Number(($event.target as HTMLInputElement).value) })" />
             <output class="mono">{{ store.glass[k.key] }}{{ k.unit }}</output>
           </label>
-          <span class="muted" style="font-size: 12px">{{ t('admin.glassNote') }} <button type="button" class="linkish" style="display: inline; padding: 0" @click="setGlass(GLASS_DEFAULT)">{{ t('admin.glassReset') }}</button></span>
+          <span class="muted" style="font-size: 12px">{{ t(refracts ? 'admin.glassNote' : 'admin.glassNoteFrosted') }} <button type="button" class="linkish" style="display: inline; padding: 0" @click="setGlass(GLASS_DEFAULT)">{{ t('admin.glassReset') }}</button></span>
         </div>
         <label class="switch">
           <input type="checkbox" :checked="v.settings.remoteImages" @change="save({ remoteImages: ($event.target as HTMLInputElement).checked })" />

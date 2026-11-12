@@ -663,37 +663,30 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
 }
 
 /* ---------- Phone menu bar in liquid glass ----------
-   Layers: the bar itself is transparent; ::before carries the blurred backdrop and is bent at the rim by the SVG
-   refraction filter (#calme-glass, a lens-shaped displacement map); ::after adds the tint, the sheen and the light
-   rim. Strength, blur and tint are per-device settings (Admin › App). The bar sits low, just above the home bar. */
-:root { --bar-bottom: 10px; --glass-blur: 6px; --glass-tint: 42%; }
-.glass-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+   After nikdelvin/liquid-glass (MIT). The bar is transparent; ::before carries the backdrop: on Chromium it goes
+   through blur, the SVG displacement filter drawn for the bar's size (--glass-backdrop, see glass.ts: the rim
+   bends the backdrop like a lens, with chromatic aberration), blur again, brightness and saturation; Safari and
+   Firefox cannot filter the backdrop through SVG and keep a frosted glass. ::after adds the tint and the soft inner
+   glow. Settings per device in Admin › App. The bar sits low, just above the home bar. */
+:root { --bar-bottom: 10px; --glass-blur: 3px; --glass-tint: 45%; }
 @media (max-width: 720px) {
   :root { --bar-bottom: max(8px, calc(env(safe-area-inset-bottom) - 12px)); }
-  .tabbar { background: transparent; border: 0; border-radius: 30px; isolation: isolate; box-shadow: 0 18px 44px -14px rgba(0, 0, 0, 0.55); }
+  .tabbar { background: transparent; border: 0; border-radius: 30px; isolation: isolate; box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.5); }
   .tabbar::before, .tabbar::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; }
   .tabbar::before {
-    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(185%) brightness(1.06);
-    backdrop-filter: blur(var(--glass-blur)) saturate(185%) brightness(1.06);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 3 + 4px)) saturate(180%);
+    backdrop-filter: blur(calc(var(--glass-blur) * 3 + 4px)) saturate(180%);
   }
-  .glass-refract .tabbar::before { filter: url(#calme-glass); }
+  .glass-refract .tabbar::before { -webkit-backdrop-filter: var(--glass-backdrop); backdrop-filter: var(--glass-backdrop); }
   .tabbar::after {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 42%),
-      color-mix(in srgb, var(--surf) var(--glass-tint), transparent);
-    box-shadow:
-      inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.5),
-      inset -1px -1.5px 1px rgba(255, 255, 255, 0.14),
-      inset 0 0 22px rgba(255, 255, 255, 0.07),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, #09090b var(--glass-tint), transparent);
+    box-shadow: inset 0 0 4px 0 rgba(250, 250, 250, 0.5);
   }
-  .tabbar a[aria-current='page'] { border-radius: 24px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 16px -8px rgba(0, 0, 0, 0.5); }
-  [data-theme='light'] .tabbar { box-shadow: 0 16px 40px -16px rgba(0, 0, 0, 0.3); }
+  .tabbar a[aria-current='page'] { border-radius: 24px; background: color-mix(in srgb, var(--prim-bg) 88%, transparent); box-shadow: inset 0 0 4px 0 rgba(255, 255, 255, 0.45); }
+  [data-theme='light'] .tabbar { box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.28); }
   [data-theme='light'] .tabbar::after {
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 48%),
-      color-mix(in srgb, #ffffff var(--glass-tint), transparent);
-    box-shadow: inset 1.5px 1.5px 1px rgba(255, 255, 255, 0.95), inset -1px -1.5px 1px rgba(0, 0, 0, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    background: color-mix(in srgb, #fafafa var(--glass-tint), transparent);
+    box-shadow: inset 0 0 4px 0 rgba(255, 255, 255, 0.9), inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
   }
 }
 .cal-title { text-transform: none; }
@@ -929,3 +922,7 @@ html { font-optical-sizing: auto; }
   .tl-date { top: calc(var(--top-band) + 8px); }
 }
 .answer-sec li { display: list-item; grid-template-columns: none; }
+
+/* iPhone keyboard open: the bottom bar and the Écrire button would float over the fields; they step aside. */
+html.kb-open .tabbar,
+html.kb-open .fab { display: none; }
