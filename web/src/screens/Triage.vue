@@ -16,6 +16,7 @@ import { closeTab, cycleTab, openTab, pruneTabs, toggleCompare } from '../tabLog
 import { tabs, updateTabs, useMedia } from '../tabs.ts';
 import { isUnread } from '../unread.ts';
 import Reader from './Reader.vue';
+import { usePullRefresh } from '../pullRefresh.ts';
 
 const props = defineProps<{ filter: Category | 'all' }>();
 const { t } = useI18n();
@@ -315,6 +316,15 @@ onMounted(() => {
   if (canPush) void isSubscribed().then((v) => (pushOn.value = v));
 });
 
+// On the phone, pulling the list down from the top fetches mail (not while a mail is open over it).
+const pulled = ref(false);
+const ptr = usePullRefresh(() => {
+  pulled.value = true;
+  void sync();
+}, computed(() => reading.value && !wide.value));
+watch(syncing, (on) => {
+  if (!on) pulled.value = false;
+});
 async function sync() {
   try {
     await syncNow();
@@ -335,6 +345,14 @@ async function turnOnPush() {
 </script>
 
 <template>
+  <div
+    v-if="ptr.offset.value > 0 || (pulled && syncing)"
+    :class="['ptr', { armed: ptr.armed.value, spinning: pulled && syncing, dragging: ptr.offset.value > 0 }]"
+    :style="{ transform: `translateY(${pulled && syncing && !ptr.offset.value ? 56 : ptr.offset.value}px)` }"
+    aria-hidden="true"
+  >
+    <span :style="{ transform: `rotate(${ptr.offset.value * 4}deg)` }"><Icon name="refresh" :size="18" /></span>
+  </div>
   <div :class="['overview', { 'hide-mobile': reading }]">
     <header class="topbar triage-bar">
       <span class="eyebrow">{{ meta }}</span>

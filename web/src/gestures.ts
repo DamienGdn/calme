@@ -34,3 +34,7 @@ export function sheetSwipe(dy: number, ms: number, height: number): 'down' | 'up
   if (dy < 0 && (-dy > 80 || flick(-dy, ms, 50))) return 'up';
   return null;
 }
+
+/** Pull to refresh: the indicator follows half the finger's travel (90 px at most); 120 px of travel fetches mail. */
+export const pullOffset = (dy: number) => Math.min(90, Math.max(0, dy / 2));
+export const pullTriggers = (dy: number) => dy >= 120;

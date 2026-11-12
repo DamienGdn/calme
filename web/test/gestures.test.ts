@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { axis, sheetSwipe, swipeAction, swipeBack } from '../src/gestures.ts';
+import { axis, pullOffset, pullTriggers, sheetSwipe, swipeAction, swipeBack } from '../src/gestures.ts';
 
 test('axis waits for a real move, then locks on the dominant direction', () => {
   assert.equal(axis(4, 3), null);
@@ -45,4 +45,13 @@ test('a sheet pushed up, or flicked up, asks for the next step (edit an appointm
   assert.equal(sheetSwipe(-100, 600, 500), 'up');
   assert.equal(sheetSwipe(-40, 600, 500), null);
   assert.equal(sheetSwipe(-60, 80, 500), 'up'); // flick
+});
+
+test('pulling the mail list down from the top fetches mail once pulled far enough', () => {
+  assert.equal(pullOffset(0), 0);
+  assert.equal(pullOffset(-30), 0);
+  assert.equal(pullOffset(100), 50); // half the finger's travel
+  assert.equal(pullOffset(400), 90); // capped
+  assert.equal(pullTriggers(100), false);
+  assert.equal(pullTriggers(130), true);
 });
