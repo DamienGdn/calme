@@ -155,8 +155,22 @@ function onPlaceKey(e: KeyboardEvent) {
 }
 const mapUrl = computed(() => (coords.value ? mapsUrl(place.value, coords.value) : ''));
 
+// A long title wraps over several lines (a one-line field cut it on the phone); it stays one line of text: a pasted
+// line break becomes a space, Enter saves the form.
+const titleEl = ref<HTMLTextAreaElement | null>(null);
+function fitTitle() {
+  const el = titleEl.value;
+  if (!el) return;
+  if (/\n/.test(title.value)) title.value = title.value.replace(/\s*\n\s*/g, ' ');
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
-onMounted(() => window.addEventListener('keydown', onKey));
+onMounted(() => {
+  window.addEventListener('keydown', onKey);
+  fitTitle();
+});
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey);
   window.clearTimeout(timer);
@@ -174,7 +188,19 @@ onBeforeUnmount(() => {
       </header>
 
       <label class="sr" for="ev-title">{{ t('agenda.form.title') }}</label>
-      <input id="ev-title" v-model="title" class="ev-title" required autocomplete="off" :placeholder="t('agenda.form.titlePh')" />
+      <textarea
+        id="ev-title"
+        ref="titleEl"
+        v-model="title"
+        class="ev-title"
+        rows="1"
+        required
+        autocomplete="off"
+        enterkeyhint="done"
+        :placeholder="t('agenda.form.titlePh')"
+        @input="fitTitle"
+        @keydown.enter.prevent="($event.target as HTMLTextAreaElement).form?.requestSubmit()"
+      />
 
       <section class="ev-group" :aria-label="t('agenda.form.when')">
         <label class="ev-line switch">

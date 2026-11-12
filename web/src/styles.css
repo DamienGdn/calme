@@ -768,7 +768,7 @@ button.tl-ev:hover { background: var(--surf2); }
 .install-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: step; }
 .install-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 1.4; }
 .install-key { flex: none; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--surf2); color: var(--accent-text); border: 1px solid var(--line); }
-.ev-title { width: 100%; border: 0; outline: none; background: transparent; padding: 4px 0; font-family: 'Fraunces', Georgia, serif; font-size: 26px; line-height: 1.2; color: var(--ink); border-bottom: 1px solid var(--line); }
+.ev-title { display: block; width: 100%; resize: none; overflow: hidden; overflow-wrap: anywhere; border: 0; border-radius: 0; outline: none; background: transparent; padding: 4px 0; font-family: 'Fraunces', Georgia, serif; font-size: 26px; line-height: 1.2; color: var(--ink); border-bottom: 1px solid var(--line); }
 .ev-group { display: flex; flex-direction: column; border-radius: 16px; background: var(--surf2); padding: 4px 14px; }
 .ev-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line); }
 .ev-line:last-child { border-bottom: 0; }
