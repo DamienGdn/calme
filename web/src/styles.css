@@ -1133,6 +1133,7 @@ html.kb-open .fab { display: none; }
 .badge-check li::before { content: '●'; margin-right: 8px; font-size: 10px; vertical-align: 2px; }
 .badge-check li.ok::before { color: var(--accent-text); }
 .badge-check li.ko::before { color: var(--hot); }
-/* The site of a link in Calm's reading sits on its own line, under the link. */
-.act-link, .mail-link { flex-direction: column; align-items: flex-start; gap: 2px; }
-.act-link .act-host, .mail-link .act-host { display: block; font-size: 11px; }
+
+/* The mail's category and date sit on their own line above its title, not squeezed in the reader's toolbar. */
+.reader-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+.reader-top .actions { margin-left: auto; }
