@@ -254,6 +254,16 @@ describe('api actions', () => {
     expect(await (await app.request('/api/account', { headers: auth })).json()).toEqual({ email: 'moi@x.fr', name: 'Camille Test' });
   });
 
+  it('quick search: inbox and local base, contents included, accents ignored, newest first', async () => {
+    const { app, archive } = setup();
+    archive.add([mail('old1', { subject: 'Devis électricité', text: 'Le compteur de chantier', date: Date.parse('2026-01-05T09:00:00Z') })]);
+    const q = async (s: string) => (await app.request(`/api/search/quick?q=${encodeURIComponent(s)}`, { headers: auth })).json();
+    expect((await q('corps mail b')).map((r: { id: string }) => r.id)).toEqual(['b']);
+    const r = await q('COMPTEUR electricite');
+    expect(r).toEqual([expect.objectContaining({ id: 'old1', source: 'local', subject: 'Devis électricité' })]);
+    expect(await q(' ')).toEqual([]);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

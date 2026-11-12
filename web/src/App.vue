@@ -112,7 +112,7 @@ watch(
 
 // Moving between pages: the tab screens stay alive (no reload, no blank flash, the bar does not move), and each
 // page comes back where it was scrolled; a new page starts at the top.
-const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders'];
+const KEPT = ['Triage', 'Cleanup', 'Agenda', 'Folders', 'Search'];
 const scrolls = new Map<string, number>();
 watch(loc, (to, from) => {
   scrolls.set(`${from.route}/${from.arg}`, window.scrollY);
@@ -165,6 +165,13 @@ function placePill() {
 }
 watch([route, mini], () => void nextTick(placePill));
 const dark = computed(() => store.theme === 'dark');
+/** Shrunk bar: a tap on its tab opens it again (the next scroll down shrinks it back). */
+function unfold(e: MouseEvent, r: Route) {
+  if (!mini.value || r !== route.value) return;
+  e.preventDefault();
+  mini.value = false;
+  lastY = window.scrollY;
+}
 
 // Top menu (phone): who is signed in, settings, reminders, version.
 const menuOpen = ref(false);
@@ -280,7 +287,7 @@ const depth = (name: string) => name.split('/').length - 1;
     <nav ref="tabbarEl" :class="['tabbar', { mini: mini && onTab }]" :style="glassStyle" :aria-label="t('nav.tabs')">
       <GlassLayer :pill="pillEl" :dark="dark" :moving="pillMoves" />
       <span ref="pillEl" class="tab-pill" aria-hidden="true" :style="{ transform: `translate(${pillBox.x}px, ${pillBox.y}px)`, width: `${pillBox.w}px`, height: `${pillBox.h}px`, opacity: pillBox.w ? 1 : 0 }" />
-      <a v-for="[r, label, icon] in tabs" :key="r" ref="tabEls" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined"><Icon :name="icon" :size="22" /> <span class="tab-label">{{ t(label) }}</span></a>
+      <a v-for="[r, label, icon] in tabs" :key="r" ref="tabEls" :href="`#/${r}`" :aria-current="route === r ? 'page' : undefined" @click="unfold($event, r)"><Icon :name="icon" :size="22" /> <span class="tab-label">{{ t(label) }}</span></a>
     </nav>
     <a v-if="mini && onTab && route !== 'recherche'" href="#/recherche" class="orb" :aria-label="t('nav.searchTab')">
       <GlassLayer :dark="dark" />

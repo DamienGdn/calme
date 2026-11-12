@@ -507,6 +507,27 @@ export function createApp(d: Deps) {
     return c.json({ events: events.filter((e) => !e.calendar || !hidden.has(e.calendar.id)) });
   });
 
+  // Quick search, as you type: every word in the sender, subject or text, accents ignored; the inbox first-hand,
+  // then the local base (older mail). No Claude, no Gmail call: instant.
+  app.get('/api/search/quick', (c) => {
+    const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const q = (c.req.query('q') ?? '').slice(0, 200);
+    const words = fold(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return c.json([]);
+    const light = (m: { id: string; fromName: string; fromEmail: string; subject: string; snippet: string; date: number }, source: 'inbox' | 'local') =>
+      ({ id: m.id, fromName: m.fromName, fromEmail: m.fromEmail, subject: m.subject, snippet: m.snippet, date: m.date, source });
+    const inbox = store
+      .listInbox()
+      .filter((m) => {
+        const hay = fold(`${m.fromName} ${m.fromEmail} ${m.subject} ${m.snippet} ${m.text}`);
+        return words.every((w) => hay.includes(w));
+      })
+      .map((m) => light(m, 'inbox'));
+    const seen = new Set(inbox.map((m) => m.id));
+    const local = (d.archive?.search(q, 60, 'and') ?? []).filter((m) => !seen.has(m.id)).map((m) => light(m, 'local'));
+    return c.json([...inbox, ...local].sort((a, b) => b.date - a.date).slice(0, 80));
+  });
+
   app.post('/api/search', async (c) => {
     const { question } = await c.req.json<{ question?: string }>();
     if (!question?.trim()) return c.json({ error: 'Pose une question' }, 400);

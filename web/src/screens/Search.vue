@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue';
+import { computed, onActivated, onDeactivated, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { fullDate, post, useMailBody, when } from '../api.ts';
+import { api, fullDate, post, useMailBody, when } from '../api.ts';
 import EventSheet, { type OpenEvent } from '../components/EventSheet.vue';
 import Icon from '../components/Icon.vue';
 import MailBody from '../components/MailBody.vue';
@@ -17,8 +17,8 @@ interface Result {
   subject: string;
   snippet: string;
   date: number;
-  relevant: boolean;
-  source: 'local' | 'gmail';
+  relevant?: boolean;
+  source: 'inbox' | 'local' | 'gmail';
 }
 interface SearchResponse {
   query: string;
@@ -48,7 +48,7 @@ const evWhen = (e: OpenEvent) =>
 const upcoming = (e: OpenEvent) => Date.parse(e.allDay ? e.start + 'T23:59:59' : e.end) >= Date.now();
 const body = useMailBody(
   toRef(() => open.value?.id),
-  toRef(() => (open.value?.source === 'local' ? 'archive' : 'gmail')),
+  toRef(() => (open.value?.source === 'local' ? 'archive' : open.value?.source === 'inbox' ? 'inbox' : 'gmail')),
 );
 const examples = computed(() => tm('search.examples') as unknown as string[]);
 /** "3 nov. — Permis accordé" → date and fact, so the timeline can line the dates up. */
@@ -107,10 +107,41 @@ watch(
   },
   { immediate: true },
 );
-function submit() {
+/** Extended search: Claude over all of Gmail and the agenda (the question goes in the address, like before). */
+function extend() {
   const q = question.value.trim();
+  if (!q) return;
   if (q === props.initial) void run(q, true);
   else goTo('recherche', q);
+}
+
+// Quick search as you type: inbox and local base, contents included, instant. Return closes the phone keyboard.
+const quick = ref<Result[] | null>(null);
+let quickTimer = 0;
+let quickSeq = 0;
+watch(question, (q) => {
+  window.clearTimeout(quickTimer);
+  const s = q.trim();
+  if (!s) {
+    quick.value = null;
+    return;
+  }
+  quickTimer = window.setTimeout(async () => {
+    const seq = ++quickSeq;
+    try {
+      const r = await api<Result[]>(`/api/search/quick?q=${encodeURIComponent(s)}`);
+      if (seq === quickSeq) quick.value = r;
+    } catch (e) {
+      notifyError(e);
+    }
+  }, 220);
+});
+/** The quick list shows while the field holds something other than the question Calm answered. */
+const showQuick = computed(() => Boolean(question.value.trim()) && !(res.value && question.value.trim() === props.initial) && !busy.value);
+const listed = computed(() => (showQuick.value ? (quick.value ?? []) : (res.value?.results ?? [])));
+const sourceLabel = (r: Result) => (r.source === 'inbox' ? t('search.inbox') : r.source === 'local' ? t('search.local') : t('search.gmail'));
+function submit() {
+  (document.activeElement as HTMLElement | null)?.blur();
 }
 
 // Opening a mail adds a history step on the phone: the back gesture returns to the results, not out of the search.
@@ -122,8 +153,9 @@ function closeMail() {
 const onPop = () => {
   if (!history.state?.calmReading) open.value = null;
 };
-onMounted(() => window.addEventListener('popstate', onPop));
-onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
+// Kept alive between tabs (App.vue): the back gesture is listened to only while the screen shows.
+onActivated(() => window.addEventListener('popstate', onPop));
+onDeactivated(() => window.removeEventListener('popstate', onPop));
 </script>
 
 <template>
@@ -133,18 +165,22 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
   <form class="ask-big" role="search" @submit.prevent="submit">
     <span class="dot" aria-hidden="true" />
     <label class="sr" for="q">{{ t('search.label') }}</label>
-    <input id="q" v-model="question" :placeholder="t('search.placeholder')" autofocus />
-    <button class="btn btn-prim" :disabled="busy || !question.trim()">{{ busy ? t('search.busy') : t('search.go') }}</button>
+    <input id="q" v-model="question" :placeholder="t('search.quickPlaceholder')" type="search" enterkeyhint="search" />
+    <button type="button" class="btn btn-prim" :disabled="busy || !question.trim()" :title="t('search.extendHint')" @click="extend">{{ busy ? t('search.busy') : t('search.extend') }}</button>
   </form>
 
-  <div v-if="!res && !busy" style="display: flex; flex-wrap: wrap; gap: 8px">
-    <button v-for="x in examples" :key="x" type="button" class="folder" @click="goTo('recherche', x)">{{ x }}</button>
+  <div v-if="!question.trim() && !res && !busy" style="display: flex; flex-direction: column; gap: 10px">
+    <span class="eyebrow">{{ t('search.askCalm') }}</span>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px">
+      <button v-for="x in examples" :key="x" type="button" class="folder" @click="goTo('recherche', x)">{{ x }}</button>
+    </div>
   </div>
+  <p v-if="showQuick && quick && !quick.length" class="empty">{{ t('search.noQuick') }}</p>
 
   <p v-if="busy" class="empty">{{ t('search.busyLong') }}</p>
   </template>
 
-  <template v-if="res">
+  <template v-if="res && !showQuick">
     <section v-if="!(phone && open)" class="claude-box" :aria-label="t('search.answer')">
       <span class="eyebrow" style="display: flex; align-items: center; gap: 8px"><span class="dot" /> {{ t('search.answer') }}</span>
       <p v-if="lead.length" class="answer-lead">
@@ -180,16 +216,19 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
       </button>
     </section>
     <EventSheet v-if="openedEvent" :event="openedEvent" @close="openedEvent = null" />
+  </template>
 
+  <template v-if="listed.length || open">
+    <span v-if="showQuick && !(phone && open)" class="eyebrow">{{ t('search.inMails') }} · {{ listed.length }}</span>
     <div :class="['split', { reading: open }]">
       <section class="list" :aria-label="t('search.found')">
-        <button v-for="r in res.results" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="read(r)">
+        <button v-for="r in listed" :key="r.id" type="button" class="row" :aria-current="open?.id === r.id" @click="read(r)">
           <span class="mark" :style="{ background: r.relevant ? 'var(--accent)' : 'var(--line)' }" aria-hidden="true" />
           <span class="from">{{ r.fromName }}</span>
           <span class="time">{{ when(r.date) }}</span>
           <span class="subj">{{ r.subject || t('common.noSubject') }}</span>
           <span class="one">
-            <span class="mono" style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 6px">{{ r.source === 'local' ? t('search.local') : t('search.gmail') }}</span>
+            <span class="mono" style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 6px">{{ sourceLabel(r) }}</span>
             {{ r.relevant ? t('search.used') : '' }}{{ r.snippet }}
           </span>
         </button>
