@@ -291,6 +291,7 @@ const fr = {
     test: 'Tester la pastille',
     tested: 'Pastille posée : {n}. Va voir l’icône sur l’écran d’accueil.',
     unsupported: 'La pastille n’est pas prise en charge sur cet appareil.',
+    noPush: 'Cet iPhone n’est pas abonné aux notifications de Calm : touche « Activer sur cet appareil » puis refais le test.',
   },
   trash: {
     eyebrow: 'Corbeille Gmail',
@@ -978,6 +979,7 @@ const en: Messages = {
     test: 'Test the badge',
     tested: 'Badge set: {n}. Look at the icon on the home screen.',
     unsupported: 'The badge is not supported on this device.',
+    noPush: 'This phone is not subscribed to Calm’s notifications: tap “Enable on this device”, then test again.',
   },
   trash: {
     eyebrow: 'Gmail trash',

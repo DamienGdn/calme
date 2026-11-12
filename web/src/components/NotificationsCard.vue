@@ -28,9 +28,15 @@ async function tryBadge() {
     notifyError(e);
   } finally {
     badge.value = badgeStatus();
-    // Sent to the computer running Calm, so a badge that does not show can be diagnosed there (no mail data).
+    // iOS shows a badge set from a push far more reliably than one set by the page: a test push carries it too.
     const reg = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+    const sub = await reg?.pushManager?.getSubscription().catch(() => null);
+    let pushed = 'no-subscription';
+    if (sub) pushed = await post<{ ok: boolean }>('/api/push/test', { endpoint: sub.endpoint }).then((r) => (r.ok ? 'sent' : 'unknown-on-server')).catch((e) => `error: ${(e as Error).message}`);
+    if (pushed !== 'sent') notify(t('badge.noPush'), true);
+    // Sent to the computer running Calm, so a badge that does not show can be diagnosed there (no mail data).
     void post('/api/diag/badge', {
+      pushed,
       version: __APP_VERSION__,
       result,
       n: n || 1,
