@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LogoMark from '../components/LogoMark.vue';
 import { onBeforeUnmount, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, setToken, Unauthorized } from '../api.ts';
@@ -75,7 +76,7 @@ onBeforeUnmount(() => window.clearInterval(timer));
 <template>
   <div class="pairing">
     <div class="rise pair-box">
-      <div class="logo" aria-hidden="true">c.</div>
+      <div class="logo" aria-hidden="true"><LogoMark /></div>
       <h1 class="headline" style="font-size: 40px">{{ t('pairing.title') }} <em>{{ t('pairing.titleEm') }}</em></h1>
       <p class="muted" style="margin: 0; line-height: 1.6">{{ t('pairing.help') }}</p>
 

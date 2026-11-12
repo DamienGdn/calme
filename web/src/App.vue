@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LogoMark from './components/LogoMark.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, CAT_COLOR, type Category } from './api.ts';
@@ -198,7 +199,7 @@ const depth = (name: string) => name.split('/').length - 1;
   <div v-else class="shell">
     <aside class="sidebar" :aria-label="t('nav.main')">
       <div class="brand">
-        <span class="logo" aria-hidden="true">c.</span>
+        <span class="logo" aria-hidden="true"><LogoMark /></span>
         <span class="wordmark">Calm<span class="wordmark-dot">.</span></span>
       </div>
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import LogoMark from '../components/LogoMark.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
@@ -102,7 +103,7 @@ async function finish() {
   <div class="setup">
     <header class="setup-head">
       <div class="brand">
-        <span class="logo" aria-hidden="true">c.</span>
+        <span class="logo" aria-hidden="true"><LogoMark /></span>
         <span class="wordmark">Calm<span class="wordmark-dot">.</span></span>
       </div>
       <select class="select" :value="locale" :aria-label="t('common.language')" @change="savePref({ language: ($event.target as HTMLSelectElement).value as Lang })">
