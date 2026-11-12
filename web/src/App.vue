@@ -2,7 +2,7 @@
 import LogoMark from './components/LogoMark.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, CAT_COLOR, type Category } from './api.ts';
+import { activity, api, CAT_COLOR, type Category } from './api.ts';
 import GlassLayer from './components/GlassLayer.vue';
 import Icon, { type IconName } from './components/Icon.vue';
 import PairRequests from './components/PairRequests.vue';
@@ -191,15 +191,25 @@ watch(
 const initial = computed(() => (account.value?.name || account.value?.email || 'C').trim().charAt(0).toUpperCase());
 const onMenuKey = (e: KeyboardEvent) => e.key === 'Escape' && (menuOpen.value = false);
 const depth = (name: string) => name.split('/').length - 1;
+/** Calm is working: a sync or triage on the server, or a request the user waits on (shown after 300 ms, so quick ones don't flash). */
+const waiting = ref(false);
+let waitTimer: ReturnType<typeof setTimeout> | undefined;
+watch(activity, (n) => {
+  clearTimeout(waitTimer);
+  if (n > 0) waitTimer = setTimeout(() => (waiting.value = true), 300);
+  else waiting.value = false;
+});
+const busy = computed(() => Boolean(store.state?.running || store.state?.analyzing || waiting.value));
 </script>
 
 <template>
   <Pairing v-if="!store.paired" />
   <Setup v-else-if="store.state && (store.state.setupDone === false || route === 'installation')" />
   <div v-else class="shell">
+    <span class="sr" role="status">{{ busy ? t('common.working') : '' }}</span>
     <aside class="sidebar" :aria-label="t('nav.main')">
-      <div class="brand">
-        <span class="logo" aria-hidden="true"><LogoMark /></span>
+      <div :class="['brand', { busy }]">
+        <span class="logo" aria-hidden="true"><LogoMark :busy="busy" /></span>
         <span class="wordmark">Calm<span class="wordmark-dot">.</span></span>
       </div>
 
@@ -270,7 +280,7 @@ const depth = (name: string) => name.split('/').length - 1;
 
 
     <header class="appbar">
-      <span class="appbar-brand">Calm<span class="wordmark-dot">.</span></span>
+      <span :class="['appbar-brand', { busy }]">Calm<span class="wordmark-dot">.</span></span>
       <button type="button" class="appbar-menu" :aria-label="t('nav.menu')" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen"><Icon name="menu" :size="20" /></button>
     </header>
     <div v-if="menuOpen" class="appmenu-backdrop" @click.self="menuOpen = false">
