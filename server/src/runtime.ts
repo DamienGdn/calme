@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { createCalendarPort, formatAgenda, type CalendarPort } from './calendar.ts';
 import { execFile } from 'node:child_process';
 import { cliRunner, type ClaudeRunner } from './claude.ts';
+import { openUsage, usageKind } from './usage.ts';
 import { autoUnsubscribe } from './newsletters.ts';
 import { openArchive } from './archive.ts';
 import { applyStagedRestore, backupNow, defaultBackupDir, pruneBackups } from './backup.ts';
@@ -29,7 +30,12 @@ export function createRuntime() {
   const baseOAuth = createOAuth(cfg.home);
   const settings = () => getSettings(store, { model: cfg.model, intervalMin: cfg.intervalMin });
   // Model read at call time so a change in the admin page applies without restart.
-  const runner: ClaudeRunner = withLanguage((i) => cliRunner(settings().model)(i), () => settings().language);
+  // Each call's cost and tokens are kept for the cost page (usage.ts).
+  const aiUsage = openUsage(store.db);
+  const runner: ClaudeRunner = withLanguage(
+    (i) => cliRunner(settings().model, 180_000, (u, schema) => aiUsage.record(usageKind(schema), u))(i),
+    () => settings().language,
+  );
   const notifier = createNotifier(store, cfg.vapid);
   const reminders = openReminders(store.db);
   const archive = openArchive(store.db);

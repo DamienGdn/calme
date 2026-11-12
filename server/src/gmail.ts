@@ -29,6 +29,8 @@ export interface GmailPort {
   createLabel(name: string): Promise<{ id: string; name: string }>;
   /** Removes the label from Gmail; its mails stay (in All mail, or wherever their other labels put them). */
   deleteLabel(id: string): Promise<void>;
+  /** The latest mails in Gmail's trash (kept there 30 days). */
+  listTrash(max: number): Promise<string[]>;
   /** Every mail carrying the label (5,000 at most). */
   labelMessageIds(labelId: string): Promise<string[]>;
   /** Adds and removes labels on many mails at once (1,000 per call). */
@@ -203,6 +205,10 @@ export function createGmailPort(auth: OAuth2Client, background = false): GmailPo
     },
     async deleteLabel(id) {
       await call(COST.labelEdit, () => users.labels.delete({ userId: 'me', id }));
+    },
+    async listTrash(max) {
+      const res = await call(COST.list, () => users.messages.list({ userId: 'me', q: 'in:trash', includeSpamTrash: true, maxResults: max }));
+      return (res.data.messages ?? []).map((m) => m.id).filter((id): id is string => Boolean(id));
     },
     async labelMessageIds(labelId) {
       const ids: string[] = [];

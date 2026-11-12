@@ -21,6 +21,7 @@ import { backupNow, listBackups, pruneBackups, stageRestore } from './backup.ts'
 import type { Archive } from './archive.ts';
 import { EARLY, openReminders } from './reminders.ts';
 import { openLogos } from './logos.ts';
+import { openUsage } from './usage.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
 
@@ -232,6 +233,10 @@ export function createApp(d: Deps) {
 
   app.get('/api/quota', (c) => c.json(quotaUsage()));
 
+  // Claude's use by Calm (API-price equivalent of each claude -p call), for the cost page.
+  const usage = openUsage(store.db);
+  app.get('/api/ai-usage', (c) => c.json(usage.summary()));
+
   // Who is signed in, for the menu: the Gmail address and the name mails go out under (asked once).
   let account: { email: string; name: string } | null = null;
   app.get('/api/account', async (c) => {
@@ -317,11 +322,9 @@ export function createApp(d: Deps) {
   });
 
   // Gmail folders (labels): browsed live from Gmail, read-only, never triaged.
-  app.get('/api/labels/:id/messages', async (c) => {
-    const g = gmail();
-    // Headers only (20 quota units each instead of 60): the body is fetched when a mail is opened.
-    const ids = await g.listByLabel(c.req.param('id'), 50);
-    const items = await Promise.all(
+  // Headers only (20 quota units each instead of 60): the body is fetched when a mail is opened.
+  const headerItems = (g: GmailPort, ids: string[]) =>
+    Promise.all(
       ids.map(async (id) => {
         const h = await g.getHeaders(id);
         const from = parseAddress(h.From ?? '');
@@ -337,7 +340,16 @@ export function createApp(d: Deps) {
         };
       }),
     );
-    return c.json(items);
+
+  app.get('/api/labels/:id/messages', async (c) => {
+    const g = gmail();
+    return c.json(await headerItems(g, await g.listByLabel(c.req.param('id'), 50)));
+  });
+
+  // Gmail's trash (30 days): shown so mails can be brought back (/api/mails/untrash). Never emptied by Calm.
+  app.get('/api/trash', async (c) => {
+    const g = gmail();
+    return c.json(await headerItems(g, await g.listTrash(80)));
   });
 
   app.get('/api/gmail/:id', async (c) => {

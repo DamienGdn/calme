@@ -16,6 +16,8 @@ import Folders from './screens/Folders.vue';
 import Newsletters from './screens/Newsletters.vue';
 import Pairing from './screens/Pairing.vue';
 import Reminders from './screens/Reminders.vue';
+import Trash from './screens/Trash.vue';
+import AiCost from './screens/AiCost.vue';
 import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
@@ -133,6 +135,8 @@ const tools: { r: Route; label: string; icon: IconName }[] = [
   { r: 'desabonnements', label: 'nav.unsubscribe', icon: 'unsub' },
   { r: 'agenda', label: 'nav.agenda', icon: 'calendar' },
   { r: 'rappels', label: 'nav.reminders', icon: 'clock' },
+  { r: 'corbeille', label: 'nav.trash', icon: 'trash' },
+  { r: 'couts', label: 'nav.aiCost', icon: 'chart' },
 ];
 const tabs: [Route, string, IconName][] = [
   ['tri', 'nav.mail', 'mail'],
@@ -258,6 +262,8 @@ const depth = (name: string) => name.split('/').length - 1;
       <Admin v-else-if="route === 'admin'" />
       <Search v-else-if="route === 'recherche'" :initial="loc.arg" />
       <Reminders v-else-if="route === 'rappels'" />
+      <Trash v-else-if="route === 'corbeille'" />
+      <AiCost v-else-if="route === 'couts'" />
       </KeepAlive>
     </main>
 
@@ -277,6 +283,7 @@ const depth = (name: string) => name.split('/').length - 1;
         </div>
         <a href="#/admin" class="appmenu-item"><Icon name="gear" :size="18" /> <span class="grow">{{ t('nav.settings') }}</span><span class="dot" :style="{ background: healthy ? 'var(--accent)' : 'var(--hot)' }" aria-hidden="true" /></a>
         <a href="#/menage" class="appmenu-item"><Icon name="trash" :size="18" /> <span class="grow">{{ t('nav.cleanup') }}</span></a>
+        <a href="#/couts" class="appmenu-item"><Icon name="chart" :size="18" /> <span class="grow">{{ t('nav.aiCost') }}</span></a>
         <a href="#/desabonnements" class="appmenu-item"><Icon name="unsub" :size="18" /> <span class="grow">{{ t('nav.unsubscribe') }}</span></a>
         <a href="#/ecrire" class="appmenu-item" @click="draft = {}"><Icon name="pen" :size="18" /> <span class="grow">{{ t('nav.newMessage') }}</span></a>
         <span class="appmenu-version mono">Calm {{ version }}</span>

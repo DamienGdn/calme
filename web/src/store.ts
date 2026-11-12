@@ -171,8 +171,8 @@ export function setThemePref(pref: ThemePref) {
 darkQuery.addEventListener('change', () => store.themePref === 'system' && applyTheme());
 applyTheme();
 
-export type Route = 'rappels' | 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
-const ROUTES: Route[] = ['rappels', 'tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];
+export type Route = 'corbeille' | 'couts' | 'rappels' | 'tri' | 'ecrire' | 'menage' | 'desabonnements' | 'agenda' | 'dossiers' | 'admin' | 'recherche' | 'installation';
+const ROUTES: Route[] = ['corbeille', 'couts', 'rappels', 'tri', 'ecrire', 'menage', 'desabonnements', 'agenda', 'dossiers', 'admin', 'recherche', 'installation'];
 
 /** Hash routes: #/tri[/reply], #/dossiers[/<labelId>], #/recherche[/<question>]… */
 export function parseHash(): { route: Route; arg: string } {

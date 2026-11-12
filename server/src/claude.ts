@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
+import { usageFrom, type Usage } from './usage.ts';
 
 export type ClaudeRunner = (i: { system: string; prompt: string; schema: object }) => Promise<unknown>;
 
@@ -8,7 +9,7 @@ export type ClaudeRunner = (i: { system: string; prompt: string; schema: object 
  * No tools, no MCP servers, no user settings or hooks: the model can only answer with schema-validated JSON,
  * so a malicious email cannot make it act on the machine.
  */
-export function cliRunner(model: string, timeoutMs = 180_000): ClaudeRunner {
+export function cliRunner(model: string, timeoutMs = 180_000, onUsage?: (u: Usage, schema: object) => void): ClaudeRunner {
   return ({ system, prompt, schema }) =>
     new Promise((resolve, reject) => {
       const args = [
@@ -39,6 +40,7 @@ export function cliRunner(model: string, timeoutMs = 180_000): ClaudeRunner {
         clearTimeout(timer);
         try {
           const res = JSON.parse(out);
+          onUsage?.(usageFrom(res), schema);
           if (res.is_error || res.structured_output == null) throw new Error(String(res.result ?? 'réponse vide'));
           resolve(res.structured_output);
         } catch (e) {

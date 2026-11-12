@@ -322,6 +322,20 @@ describe('api actions', () => {
     expect((await send('/api/mails/trash', { ids: [] })).status).toBe(400);
   });
 
+  it('reports what Calm’s use of Claude costs', async () => {
+    const { app } = setup();
+    const r = await (await app.request('/api/ai-usage', { headers: auth })).json();
+    expect(r.today).toEqual({ cost: 0, calls: 0 });
+    expect(r.days).toHaveLength(30);
+  });
+
+  it('lists the trash (headers only), to bring mails back', async () => {
+    const { app, g } = setup();
+    const r = await (await app.request('/api/trash', { headers: auth })).json();
+    expect(r.map((m: { id: string }) => m.id)).toEqual(['t1', 't2']);
+    expect(g.calls.some((c) => c.method === 'get')).toBe(false);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

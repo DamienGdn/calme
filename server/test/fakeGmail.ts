@@ -102,6 +102,10 @@ export function fakeGmail(ids: string[] = []) {
     async deleteLabel(id) {
       record('deleteLabel', id);
     },
+    async listTrash(max) {
+      record('listTrash', max);
+      return ['t1', 't2'];
+    },
     async labelMessageIds(labelId) {
       record('labelMessageIds', labelId);
       return ['f1', 'f2'];

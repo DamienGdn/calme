@@ -496,6 +496,7 @@ function askCalme() {
   <div v-if="!selecting && !(phone && reading)" class="dial">
     <div v-if="dial" class="dial-backdrop" @click="dial = false" />
     <div v-if="dial" class="dial-items" role="menu">
+      <a href="#/corbeille" role="menuitem" class="dial-item" style="--i: 3" @click="dial = false"><Icon name="restore" :size="18" /> {{ t('nav.trash') }}</a>
       <a href="#/desabonnements" role="menuitem" class="dial-item" style="--i: 2" @click="dial = false"><Icon name="unsub" :size="18" /> {{ t('nav.unsubscribe') }}</a>
       <a href="#/menage" role="menuitem" class="dial-item" style="--i: 1" @click="dial = false"><Icon name="trash" :size="18" /> {{ t('nav.cleanup') }}<span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
       <button type="button" role="menuitem" class="dial-item" style="--i: 0" @click="dial = false; openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>

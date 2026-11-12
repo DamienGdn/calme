@@ -2,7 +2,7 @@
 export type IconName =
   | 'sort' | 'pen' | 'trash' | 'folder' | 'archive' | 'refresh' | 'sun' | 'moon' | 'back' | 'arrow'
   | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns' | 'check'
-  | 'mail' | 'clock' | 'menu' | 'plus' | 'move';
+  | 'mail' | 'clock' | 'menu' | 'plus' | 'move' | 'chart' | 'restore';
 
 defineProps<{ name: IconName; size?: number }>();
 
@@ -26,6 +26,8 @@ const PATHS: Record<IconName, string[]> = {
   mail: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 7 9 6 9-6'],
   menu: ['M4 7h16M4 12h16M4 17h16'],
   plus: ['M12 5v14M5 12h14'],
+  chart: ['M4 20h16', 'M7 16v-5M12 16V7M17 16v-8'],
+  restore: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'],
   move: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M9 13h6M13 11l2 2-2 2'],
   clock: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z', 'M12 7v5l3 2'],
   columns: ['M5 4h5v16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z', 'M14 4h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-5Z'],
