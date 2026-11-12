@@ -292,7 +292,8 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
       <span class="admin-credit-mark" aria-hidden="true"><LogoMark /></span>
       <span>
         <b>Calm {{ version }}</b><br />
-        <span class="muted">{{ t('admin.madeBy', { name: 'Damien Guesdon' }) }}</span>
+        <span class="muted">{{ t('admin.madeBy', { name: 'Damien Guesdon' }) }}</span><br />
+        <a href="https://github.com/DamienGdn/calme" target="_blank" rel="noopener noreferrer">github.com/DamienGdn/calme ↗</a>
       </span>
     </footer>
   </template>
