@@ -9,6 +9,7 @@ import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
 import { isUnread } from '../unread.ts';
 import { actionKinds, fileTarget } from '../actions.ts';
+import { findPhones } from '../phones.ts';
 import { useUnsubscribe } from '../unsub.ts';
 import UnsubBar from './UnsubBar.vue';
 import ReminderSheet from '../components/ReminderSheet.vue';
@@ -26,6 +27,8 @@ const remind = ref(false);
 const kinds = computed(() => (a.value?.action ? actionKinds(a.value.action) : []));
 const unsub = useUnsubscribe(() => props.mail);
 /** "Ranger dans Factures": a button that files the mail there (the folder is made when missing). */
+/** Phone numbers in the mail, offered as call buttons (three at most, each once). */
+const phones = computed(() => [...new Map(findPhones(body.value ?? '').map((p) => [p.tel, p])).values()].slice(0, 3));
 const folder = computed(() => (a.value?.action ? fileTarget(a.value.action) : null));
 const eventLink = ref<string | null>(null);
 
@@ -95,6 +98,9 @@ function eventDate(start: string, end: string) {
       <a v-if="actionLinks.get(mail.id)?.via === 'summary'" class="mail-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">
         ↗ {{ actionLinks.get(mail.id)!.label }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }}</span>
       </a>
+      <div v-if="phones.length" class="act-buttons">
+        <a v-for="p in phones" :key="p.tel" class="btn" :href="p.tel"><Icon name="phone" :size="16" /> {{ p.raw }}</a>
+      </div>
       <div v-if="kinds.length || folder" class="act-buttons">
         <button v-if="folder" type="button" class="btn btn-prim" :disabled="busy" @click="emit('file', folder)"><Icon name="folder" :size="16" /> {{ t('reader.fileIn', { name: folder }) }}</button>
         <button v-if="kinds.includes('unsub')" type="button" class="btn btn-prim" :disabled="unsub.status.value !== 'idle'" @click="unsub.go()">

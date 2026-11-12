@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api } from '../api.ts';
+import { findPhones } from '../phones.ts';
 import { store } from '../store.ts';
 
 /**
@@ -46,9 +47,35 @@ const doc = computed(() => {
 });
 
 let resize: ResizeObserver | null = null;
+/** Phone numbers in the formatted mail become tel: links (text outside existing links only). */
+function linkPhones(d: Document) {
+  const walker = d.createTreeWalker(d.body, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest('a, script, style, title') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const nodes: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+  for (const node of nodes) {
+    const found = findPhones(node.data);
+    if (!found.length) continue;
+    const frag = d.createDocumentFragment();
+    let last = 0;
+    for (const p of found) {
+      frag.append(node.data.slice(last, p.start));
+      const a = d.createElement('a');
+      a.href = p.tel;
+      a.textContent = p.raw;
+      frag.append(a);
+      last = p.end;
+    }
+    frag.append(node.data.slice(last));
+    node.replaceWith(frag);
+  }
+}
+
 function measure() {
   const d = frame.value?.contentDocument;
   if (!d?.body) return;
+  linkPhones(d);
   const fit = () => (height.value = Math.max(80, d.documentElement.scrollHeight));
   fit();
   resize?.disconnect();
@@ -58,9 +85,19 @@ function measure() {
 }
 onBeforeUnmount(() => resize?.disconnect());
 
-// Text mails: split out the links so they can be clicked.
+// Text mails: split out the links and phone numbers so they can be clicked.
 const parts = computed(() =>
-  (props.text ?? '').split(/(https?:\/\/[^\s<>"')\]]+)/g).map((s, i) => (i % 2 ? { text: s, url: s } : { text: s, url: null })),
+  (props.text ?? '').split(/(https?:\/\/[^\s<>"')\]]+)/g).flatMap((s, i) => {
+    if (i % 2) return [{ text: s, url: s }];
+    const out: { text: string; url: string | null }[] = [];
+    let last = 0;
+    for (const p of findPhones(s)) {
+      out.push({ text: s.slice(last, p.start), url: null }, { text: p.raw, url: p.tel });
+      last = p.end;
+    }
+    out.push({ text: s.slice(last), url: null });
+    return out;
+  }),
 );
 </script>
 
@@ -86,7 +123,8 @@ const parts = computed(() =>
   </div>
   <div v-else class="mail-body">
     <template v-for="(p, i) in parts" :key="i">
-      <a v-if="p.url" :href="p.url" target="_blank" rel="noopener noreferrer">{{ p.text }}</a>
+      <a v-if="p.url?.startsWith('tel:')" :href="p.url">{{ p.text }}</a>
+      <a v-else-if="p.url" :href="p.url" target="_blank" rel="noopener noreferrer">{{ p.text }}</a>
       <template v-else>{{ p.text }}</template>
     </template>
   </div>

@@ -2,7 +2,7 @@
 export type IconName =
   | 'sort' | 'pen' | 'trash' | 'folder' | 'archive' | 'refresh' | 'sun' | 'moon' | 'back' | 'arrow'
   | 'search' | 'bell' | 'clip' | 'calendar' | 'unsub' | 'gear' | 'columns' | 'check'
-  | 'mail' | 'clock' | 'menu' | 'plus' | 'move' | 'chart' | 'restore';
+  | 'mail' | 'clock' | 'menu' | 'plus' | 'move' | 'chart' | 'restore' | 'phone';
 
 defineProps<{ name: IconName; size?: number }>();
 
@@ -26,6 +26,7 @@ const PATHS: Record<IconName, string[]> = {
   mail: ['M5 5h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z', 'm3 7 9 6 9-6'],
   menu: ['M4 7h16M4 12h16M4 17h16'],
   plus: ['M12 5v14M5 12h14'],
+  phone: ['M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z'],
   chart: ['M4 20h16', 'M7 16v-5M12 16V7M17 16v-8'],
   restore: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'],
   move: ['M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M9 13h6M13 11l2 2-2 2'],
