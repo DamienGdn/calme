@@ -893,3 +893,38 @@ html { font-optical-sizing: auto; }
   .suggest li > span:last-child { margin-left: 0 !important; }
 }
 .recipients .chips { cursor: text; }
+
+/* Search answer in themed sections: each folds as a whole (chevron), points as a list; dates never cut. */
+.answer-sections { display: flex; flex-direction: column; gap: 6px; }
+.answer-sections > .fold { justify-self: end; align-self: flex-end; font-size: 13px; }
+.answer-sec { border-radius: 14px; background: var(--surf); border: 1px solid var(--line); }
+.answer-sec summary { list-style: none; display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; font-size: 15px; font-weight: 600; color: var(--ink); }
+.answer-sec summary::-webkit-details-marker { display: none; }
+.answer-sec summary::before { content: '›'; display: inline-block; width: 12px; color: var(--accent-text); font-size: 18px; line-height: 1; transition: transform 0.2s; }
+.answer-sec[open] summary::before { transform: rotate(90deg); }
+.answer-sec summary span:first-of-type { flex: 1; }
+.answer-sec summary .mono { font-size: 11px; font-weight: 400; }
+.answer-sec ul { margin: 0; padding: 0 16px 14px 38px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; line-height: 1.5; color: var(--body); }
+.answer-sec li::marker { color: var(--accent-text); }
+.answer-sec strong { color: var(--ink); font-weight: 600; }
+.points li { grid-template-columns: max-content minmax(0, 1fr); column-gap: 14px; }
+.points .mono { white-space: nowrap; }
+
+/* Admin › Calendars. */
+.cal-list { display: flex; flex-direction: column; }
+.cal-row { display: flex; align-items: center; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--line); font-size: 14px; cursor: pointer; }
+.cal-row:last-child { border-bottom: 0; }
+.cal-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+.cal-row i { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.cal-row .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* iPhone: the top band (status bar + 14px) is solid; content starts below it, sticky bars stop below it. */
+@media (max-width: 720px) {
+  :root { --top-band: calc(env(safe-area-inset-top) + 14px); }
+  body::after { height: var(--top-band); }
+  .main { padding-top: calc(var(--top-band) + 16px); }
+  .reader-top { margin-top: calc(-1 * (var(--top-band) + 16px)); padding-top: calc(var(--top-band) + 8px); }
+  .month-title { top: var(--top-band); }
+  .tl-date { top: calc(var(--top-band) + 8px); }
+}
+.answer-sec li { display: list-item; grid-template-columns: none; }

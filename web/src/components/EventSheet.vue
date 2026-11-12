@@ -19,7 +19,7 @@ export interface OpenEvent {
   fromMail?: string;
 }
 const props = defineProps<{ event: OpenEvent; canDelete?: boolean; busy?: boolean }>();
-const emit = defineEmits<{ close: []; delete: [] }>();
+const emit = defineEmits<{ close: []; delete: []; edit: [] }>();
 const confirming = ref(false);
 const { t } = useI18n();
 
@@ -65,9 +65,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
       <p v-if="event.fromMail" class="muted" style="margin: 0; font-size: 14px">{{ event.fromMail }}</p>
       <div v-if="event.description" class="ev-desc">{{ event.description }}</div>
       <template v-if="canDelete">
-        <button v-if="!confirming" type="button" class="btn btn-danger" style="align-self: flex-start" @click="confirming = true">
-          <Icon name="trash" :size="16" /> {{ t('agenda.delete') }}
-        </button>
+        <span v-if="!confirming" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" class="btn btn-prim" @click="emit('edit')"><Icon name="pen" :size="16" /> {{ t('agenda.edit') }}</button>
+          <button type="button" class="btn btn-danger" @click="confirming = true"><Icon name="trash" :size="16" /> {{ t('agenda.delete') }}</button>
+        </span>
         <div v-else class="ev-confirm" role="alert">
           <p>{{ t('agenda.deleteConfirm') }}</p>
           <span style="display: flex; gap: 8px; flex-wrap: wrap">

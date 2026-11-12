@@ -7,6 +7,7 @@ import BackupCard from '../components/BackupCard.vue';
 import IphoneCard from '../components/IphoneCard.vue';
 import NotificationsCard from '../components/NotificationsCard.vue';
 import SignatureCard from '../components/SignatureCard.vue';
+import CalendarsCard from '../components/CalendarsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
 import { GLASS_DEFAULT, notify, notifyError, refresh, setGlass, setThemePref, store, type Glass, type ThemePref } from '../store.ts';
@@ -32,6 +33,7 @@ interface Settings {
   remoteImages: boolean;
   signature: string;
   signatureOn: boolean;
+  hiddenCalendars: string[];
 }
 interface AdminView {
   claude: { installed: boolean; version: string | null };
@@ -257,6 +259,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
         <button type="button" class="btn" style="align-self: flex-start" @click="save({ keepSenders: keep.split(/[\s,;]+/) }, t('admin.listSaved'))">{{ t('admin.saveList') }}</button>
       </section>
 
+      <CalendarsCard :hidden="v.settings.hiddenCalendars" @save="save" />
       <SignatureCard :signature="v.settings.signature" :on="v.settings.signatureOn" @save="save" />
       <BackupCard :local="local" />
       <NotificationsCard :push-mode="v.settings.pushMode" :quiet-start="v.settings.quietStart" :quiet-end="v.settings.quietEnd" @save="save" />

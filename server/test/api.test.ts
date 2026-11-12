@@ -52,8 +52,8 @@ function setup(gmailConnected = true) {
         ? { subject: 'Petit retard', body: 'Coucou Sophie, j’aurai 10 minutes de retard. [Prénom]' }
         : JSON.stringify(i.schema).includes('gmailQuery')
         ? { gmailQuery: 'from:syndic AG', explanation: 'Mails du syndic sur l’AG', keywords: ['syndic', 'AG'] }
-        : JSON.stringify(i.schema).includes('answer')
-        ? { answer: 'L’AG a lieu le 3 décembre à 18h30.', relevantIds: ['n1'] }
+        : JSON.stringify(i.schema).includes('"sections"')
+        ? { lead: 'L’AG a lieu le 3 décembre à 18h30.', sections: [], points: [], relevantIds: ['n1'] }
         : JSON.stringify(i.schema).includes('slots')
         ? {
             slots: [
@@ -85,6 +85,10 @@ function setup(gmailConnected = true) {
       },
       remove: async (calendarId: string, eventId: string) => {
         created.push({ removed: { calendarId, eventId } });
+      },
+      update: async (calendarId: string, eventId: string, e: unknown) => {
+        created.push({ updated: { calendarId, eventId, e } });
+        return { link: 'https://calendar.google.com/event?eid=y' };
       },
     }),
     backup: { dir: join(bkRoot, 'backups'), dbPath: join(bkRoot, 'calme.db') },
@@ -359,12 +363,12 @@ describe('api ai search', () => {
     });
     const body = await res.json();
     expect(body.query).toBe('from:syndic AG');
-    expect(body.answer).toBe('L’AG a lieu le 3 décembre à 18h30.');
+    expect(body.lead).toBe('L’AG a lieu le 3 décembre à 18h30.');
     expect(body.results.map((r: { id: string }) => r.id)).toEqual(['n1', 'n3']);
     expect(body.results[0].relevant).toBe(true);
     expect(g.calls.find((c) => c.method === 'listInboxIds')?.args).toEqual(['from:syndic AG', 30]);
     expect(Array.isArray(body.points)).toBe(true);
-    expect(body.lead).toBe('');
+    expect(body.sections).toEqual([]);
   });
 
   it('covers a broad topic: always asks Gmail too, even when the local base already has many mails', async () => {
@@ -500,7 +504,7 @@ describe('api admin', () => {
     const body = await (await app.request('/api/admin', { headers: auth })).json();
     expect(body.claude).toEqual({ installed: true, version: '2.1.322 (Claude Code)' });
     expect(body.google.connected).toBe(true);
-    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, model: 'haiku', intervalMin: 5 });
+    expect(body.settings).toEqual({ autoUnsubscribe: false, keepSenders: [], archiveMonths: 12, language: 'fr', pushMode: 'reply', quietStart: null, quietEnd: null, remoteImages: true, signature: '', signatureOn: false, hiddenCalendars: [], model: 'haiku', intervalMin: 5 });
   });
 
   it('validates and saves settings', async () => {
@@ -851,5 +855,35 @@ describe('subject suggestion', () => {
   it('needs some text', async () => {
     const { app } = setup();
     expect((await ask(app, { body: ' ' })).status).toBe(400);
+  });
+});
+
+describe('edit an appointment', () => {
+  const patch = (app: ReturnType<typeof setup>['app'], cal: string, id: string, b: unknown) =>
+    app.request(`/api/agenda/events/${encodeURIComponent(cal)}/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+
+  it('saves the changes on the same appointment', async () => {
+    const { app, created } = setup();
+    const res = await patch(app, 'famille-id', 'ev9', { title: 'Repas de famille', start: '2026-11-22T12:30:00+01:00', end: '2026-11-22T15:00:00+01:00', location: 'Vitré', description: 'Apporter le gâteau' });
+    expect(res.status).toBe(200);
+    expect(created.at(-1)).toEqual({
+      updated: { calendarId: 'famille-id', eventId: 'ev9', e: { title: 'Repas de famille', start: '2026-11-22T12:30:00+01:00', end: '2026-11-22T15:00:00+01:00', location: 'Vitré', allDay: false, description: 'Apporter le gâteau' } },
+    });
+  });
+
+  it('checks the same things as a new appointment, and only in calendars Calm may write to', async () => {
+    const { app } = setup();
+    expect((await patch(app, 'famille-id', 'ev9', { title: 'X', start: '2026-11-22T15:00:00+01:00', end: '2026-11-22T12:00:00+01:00' })).status).toBe(400);
+    expect((await patch(app, 'feries-id', 'ev9', { title: 'X', start: '2026-11-22T12:00:00+01:00', end: '2026-11-22T13:00:00+01:00' })).status).toBe(400);
+  });
+});
+
+describe('calendars shown', () => {
+  it('remembers the calendars to hide, for every device, and says which ones are hidden', async () => {
+    const { app } = setup();
+    const put = await app.request('/api/admin/settings', { method: 'PUT', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ hiddenCalendars: ['feries-id', 'feries-id', 7] }) });
+    expect(put.status).toBe(200);
+    const body = await (await app.request('/api/agenda', { headers: auth })).json();
+    expect(body.calendars.map((c: { id: string; hidden: boolean }) => [c.id, c.hidden])).toEqual([['primary-id', false], ['famille-id', false], ['feries-id', true]]);
   });
 });

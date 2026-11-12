@@ -15,6 +15,7 @@ interface CalInfo {
   color: string;
   primary: boolean;
   writable: boolean;
+  hidden?: boolean;
 }
 interface CalEvent extends OpenEvent {
   calendar?: { id: string; name: string; color: string; primary: boolean };
@@ -59,21 +60,16 @@ const longDay = (iso: string) => new Date(iso).toLocaleDateString(dateLocale(), 
 const todayKey = localDay(new Date());
 const calName = (c?: { name: string; primary: boolean }) => (c ? (c.primary ? t('agenda.mine') : c.name) : '');
 
-// Calendars shown (hidden ones are remembered on this device).
-const hidden = ref<Set<string>>(new Set());
-try {
-  hidden.value = new Set(JSON.parse(localStorage.getItem('calme.hiddenCalendars') ?? '[]') as string[]);
-} catch {
-  /* nothing remembered */
-}
-function toggleCal(id: string) {
+// Calendars shown: one choice for every device (Admin › Calendars, or the chips here).
+const hidden = computed(() => new Set((view.value?.calendars ?? []).filter((c) => c.hidden).map((c) => c.id)));
+async function toggleCal(id: string) {
   const next = new Set(hidden.value);
   if (!next.delete(id)) next.add(id);
-  hidden.value = next;
   try {
-    localStorage.setItem('calme.hiddenCalendars', JSON.stringify([...next]));
-  } catch {
-    /* not remembered */
+    await api('/api/admin/settings', { method: 'PUT', body: JSON.stringify({ hiddenCalendars: [...next] }) });
+    reload();
+  } catch (e) {
+    notifyError(e);
   }
 }
 const shown = (e: CalEvent) => !e.calendar || !hidden.value.has(e.calendar.id);
@@ -161,6 +157,13 @@ const months = computed(() => {
 const writable = computed(() => (view.value?.calendars ?? []).filter((c) => c.writable));
 const canDelete = (e: OpenEvent) => Boolean(e.id && e.calendar?.id && writable.value.some((c) => c.id === e.calendar!.id));
 const deleting = ref(false);
+/** Appointment being edited in the form (null for a new one). */
+const editing = ref<OpenEvent | null>(null);
+function editOpened() {
+  editing.value = opened.value;
+  opened.value = null;
+  form.value = true;
+}
 async function removeOpened() {
   const e = opened.value;
   if (!e?.id || !e.calendar?.id) return;
@@ -203,8 +206,8 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
     <a class="btn" href="/auth/google" target="_blank" rel="opener">{{ t('agenda.reconnect') }}</a>
   </div>
 
-  <NewEvent v-if="form" :day="formAt.day" :time="formAt.time" :calendars="writable" @close="form = false" @done="form = false; reload()" />
-  <EventSheet v-if="opened" :event="opened" :can-delete="canDelete(opened)" :busy="deleting" @close="opened = null" @delete="removeOpened" />
+  <NewEvent v-if="form" :day="formAt.day" :time="formAt.time" :event="editing ?? undefined" :calendars="writable" @close="form = false; editing = null" @done="form = false; editing = null; reload()" />
+  <EventSheet v-if="opened" :event="opened" :can-delete="canDelete(opened)" :busy="deleting" @close="opened = null" @delete="removeOpened" @edit="editOpened" />
 
   <div class="agenda-tools">
     <div class="tones" role="radiogroup" :aria-label="t('agenda.view')">

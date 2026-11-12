@@ -9,7 +9,12 @@ import { notify, notifyError } from '../store.ts';
  * Appointment sheet: title, all day or times (the end follows the start), place with French address suggestions
  * (Base Adresse Nationale), reminder and notes. Bottom sheet on the phone, dialog on the computer.
  */
-const props = defineProps<{ day?: string; time?: string; calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
+const props = defineProps<{
+  day?: string;
+  time?: string;
+  /** Appointment to edit (form pre-filled, saved in place). */
+  event?: { id?: string; title: string; start: string; end: string; allDay: boolean; location?: string | null; description?: string | null; calendar?: { id?: string } };
+  calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
 const emit = defineEmits<{ done: []; close: [] }>();
 const { t } = useI18n();
 
@@ -21,19 +26,22 @@ const addDays = (day: string, n: number) => {
 };
 const tomorrow = addDays(localDay(new Date()), 1);
 
-const title = ref('');
-const allDay = ref(false);
-const startDay = ref(props.day ?? tomorrow);
-const endDay = ref(props.day ?? tomorrow);
-const from = ref(props.time ?? '10:00');
-const to = ref(props.time ? `${String(Math.min(23, Number(props.time.slice(0, 2)) + 1)).padStart(2, '0')}:${props.time.slice(3, 5)}` : '11:00');
-const place = ref('');
+const ev = props.event;
+const hmOf = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const title = ref(ev?.title ?? '');
+const allDay = ref(ev?.allDay ?? false);
+const startDay = ref(ev ? (ev.allDay ? ev.start : localDay(new Date(ev.start))) : (props.day ?? tomorrow));
+const endDay = ref(ev ? (ev.allDay ? addDays(ev.end, -1) : localDay(new Date(ev.end))) : (props.day ?? tomorrow));
+const from = ref(ev && !ev.allDay ? hmOf(ev.start) : (props.time ?? '10:00'));
+const to = ref(ev && !ev.allDay ? hmOf(ev.end) : props.time ? `${String(Math.min(23, Number(props.time.slice(0, 2)) + 1)).padStart(2, '0')}:${props.time.slice(3, 5)}` : '11:00');
+const place = ref(ev?.location ?? '');
 const coords = ref<{ lat: number; lon: number } | null>(null);
-const reminder = ref<number | null>(30);
-const notes = ref('');
+/** 'keep' leaves the reminder of an edited appointment as it is. */
+const reminder = ref<number | null | 'keep'>(ev ? 'keep' : 30);
+const notes = ref(ev?.description ?? '');
 const calendarId = ref(props.calendars?.find((c) => c.primary)?.id ?? props.calendars?.[0]?.id ?? '');
 const busy = ref(false);
-const REMINDERS: (number | null)[] = [null, 10, 30, 60, 1440];
+const REMINDERS: (number | null | 'keep')[] = [...(ev ? ['keep' as const] : []), null, 10, 30, 60, 1440];
 
 /** Local date + time → RFC 3339 with the browser's UTC offset. */
 function toIso(day: string, hm: string): string {
@@ -64,14 +72,23 @@ async function submit() {
   if (!valid.value) return;
   busy.value = true;
   try {
-    await post('/api/agenda/events', {
+    const payload = {
       title: title.value.trim(),
       allDay: allDay.value,
       start: allDay.value ? startDay.value : toIso(startDay.value, from.value),
       end: allDay.value ? addDays(endDay.value, 1) : toIso(endDay.value, to.value),
       location: place.value.trim() || null,
-      description: notes.value.trim() || undefined,
-      reminderMin: reminder.value ?? undefined,
+      description: notes.value.trim() || (ev ? '' : undefined),
+      reminderMin: reminder.value === 'keep' || reminder.value === null ? undefined : reminder.value,
+    };
+    if (ev?.id && ev.calendar?.id) {
+      await api(`/api/agenda/events/${encodeURIComponent(ev.calendar.id)}/${encodeURIComponent(ev.id)}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      notify(t('agenda.updatedToast', { title: payload.title }));
+      emit('done');
+      return;
+    }
+    await post('/api/agenda/events', {
+      ...payload,
       calendarId: (props.calendars?.length ?? 0) > 1 && calendarId.value ? calendarId.value : undefined,
     });
     notify(t('agenda.addedToast', { title: title.value.trim() }));
@@ -147,8 +164,8 @@ onBeforeUnmount(() => {
       <div class="sheet-grip" aria-hidden="true" />
       <header class="sheet-head">
         <button type="button" class="linkish" @click="emit('close')">{{ t('common.cancel') }}</button>
-        <span class="eyebrow">{{ t('agenda.newEvent') }}</span>
-        <button class="btn btn-prim" :disabled="busy || !valid">{{ busy ? t('agenda.form.adding') : t('agenda.form.add') }}</button>
+        <span class="eyebrow">{{ ev ? t('agenda.editEvent') : t('agenda.newEvent') }}</span>
+        <button class="btn btn-prim" :disabled="busy || !valid">{{ busy ? t('agenda.form.adding') : ev ? t('agenda.form.save') : t('agenda.form.add') }}</button>
       </header>
 
       <label class="sr" for="ev-title">{{ t('agenda.form.title') }}</label>
@@ -204,7 +221,7 @@ onBeforeUnmount(() => {
       </section>
 
       <section class="ev-group">
-        <label v-if="(calendars?.length ?? 0) > 1" class="ev-line">
+        <label v-if="!ev && (calendars?.length ?? 0) > 1" class="ev-line">
           <span class="ev-label"><i class="cal-dot" :style="{ background: calendars?.find((c) => c.id === calendarId)?.color }" aria-hidden="true" /> {{ t('agenda.form.calendar') }}</span>
           <select id="ev-calendar" v-model="calendarId" class="select">
             <option v-for="c in calendars" :key="c.id" :value="c.id">{{ c.primary ? t('agenda.mine') : c.name }}</option>

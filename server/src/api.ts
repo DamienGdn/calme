@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import { archive, cleanupView, label, MAX_ATTACHMENTS_BYTES, NotFound, sendReply, trash, unsubscribe, untrash } from './actions.ts';
-import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, type CalendarPort } from './calendar.ts';
+import { conflictWith, formatAgenda, ISO_DATETIME, localIso, REMINDERS, type CalendarPort, type NewEvent } from './calendar.ts';
 import type { ClaudeRunner } from './claude.ts';
 import type { Config } from './config.ts';
 import { GmailDisconnected, type GmailPort } from './gmail.ts';
@@ -470,7 +470,14 @@ export function createApp(d: Deps) {
       })
       .sort((a, b) => a.event.start.localeCompare(b.event.start));
     const cals = cal ? await cal.calendars() : { list: [], limited: false };
-    return c.json({ connected: Boolean(cal), events, proposals, calendars: cals.list, limitedCalendars: cals.limited });
+    const hidden = new Set(getSettings(store, defaults()).hiddenCalendars);
+    return c.json({
+      connected: Boolean(cal),
+      events: events.filter((e) => !e.calendar || !hidden.has(e.calendar.id)),
+      proposals,
+      calendars: cals.list.map((x) => ({ ...x, hidden: hidden.has(x.id) })),
+      limitedCalendars: cals.limited,
+    });
   });
 
   app.get('/api/agenda/range', async (c) => {
@@ -481,7 +488,9 @@ export function createApp(d: Deps) {
     if (!day.test(from) || !day.test(to) || !(b > a) || b - a > 62 * 86400_000) return c.json({ error: 'Plage invalide (62 jours maximum)' }, 400);
     const cal = d.calendar?.();
     if (!cal) throw new GmailDisconnected();
-    return c.json({ events: await cal.range(localIso(from, '00:00:00'), localIso(to, '23:59:59')) });
+    const hidden = new Set(getSettings(store, defaults()).hiddenCalendars);
+    const events = await cal.range(localIso(from, '00:00:00'), localIso(to, '23:59:59'));
+    return c.json({ events: events.filter((e) => !e.calendar || !hidden.has(e.calendar.id)) });
   });
 
   app.post('/api/search', async (c) => {
@@ -497,34 +506,49 @@ export function createApp(d: Deps) {
     return c.json({ ok: true });
   });
 
-  // Appointment form: timed or all-day (end day excluded), place, notes, reminder.
-  app.post('/api/agenda/events', async (c) => {
-    const b = await c.req.json<{ title?: string; start?: string; end?: string; allDay?: boolean; location?: string | null; description?: string; reminderMin?: number; calendarId?: string }>();
+  // Appointment form: timed or all-day (end day excluded), place, notes, reminder. Shared by create and edit.
+  type EventBody = { title?: string; start?: string; end?: string; allDay?: boolean; location?: string | null; description?: string; reminderMin?: number };
+  const eventFrom = (b: EventBody): NewEvent | string => {
     const title = String(b.title ?? '').trim().slice(0, 200);
     const start = String(b.start ?? '');
     const end = String(b.end ?? '');
     const allDay = b.allDay === true;
     const DAY = /^\d{4}-\d{2}-\d{2}$/;
     const valid = allDay ? DAY.test(start) && DAY.test(end) && end > start : ISO_DATETIME.test(start) && ISO_DATETIME.test(end) && Date.parse(end) > Date.parse(start);
-    if (!title || !valid) return c.json({ error: 'Titre, début et fin valides requis (la fin après le début)' }, 400);
-    if (b.reminderMin !== undefined && !REMINDERS.includes(b.reminderMin)) return c.json({ error: 'Rappel inconnu' }, 400);
+    if (!title || !valid) return 'Titre, début et fin valides requis (la fin après le début)';
+    if (b.reminderMin !== undefined && !REMINDERS.includes(b.reminderMin)) return 'Rappel inconnu';
+    const description = String(b.description ?? '').trim().slice(0, 4000);
+    return {
+      title,
+      start,
+      end,
+      location: String(b.location ?? '').trim().slice(0, 300) || null,
+      allDay,
+      ...(description ? { description } : {}),
+      ...(b.reminderMin !== undefined ? { reminderMin: b.reminderMin } : {}),
+    };
+  };
+  const writableCalendar = async (cal: CalendarPort, id: string) => (await cal.calendars()).list.some((x) => x.id === id && x.writable);
+
+  app.post('/api/agenda/events', async (c) => {
+    const b = await c.req.json<EventBody & { calendarId?: string }>();
+    const e = eventFrom(b);
+    if (typeof e === 'string') return c.json({ error: e }, 400);
     const cal = d.calendar?.();
     if (!cal) throw new GmailDisconnected();
-    if (b.calendarId !== undefined && !(await cal.calendars()).list.some((x) => x.id === b.calendarId && x.writable))
-      return c.json({ error: 'Agenda inconnu ou en lecture seule' }, 400);
-    const description = String(b.description ?? '').trim().slice(0, 4000);
-    return c.json(
-      await cal.create({
-        title,
-        start,
-        end,
-        location: String(b.location ?? '').trim().slice(0, 300) || null,
-        allDay,
-        ...(description ? { description } : {}),
-        ...(b.reminderMin !== undefined ? { reminderMin: b.reminderMin } : {}),
-        ...(b.calendarId !== undefined ? { calendarId: b.calendarId } : {}),
-      }),
-    );
+    if (b.calendarId !== undefined && !(await writableCalendar(cal, b.calendarId))) return c.json({ error: 'Agenda inconnu ou en lecture seule' }, 400);
+    return c.json(await cal.create({ ...e, ...(b.calendarId !== undefined ? { calendarId: b.calendarId } : {}) }));
+  });
+
+  // Edit an appointment in place (same calendar).
+  app.patch('/api/agenda/events/:calendarId/:eventId', async (c) => {
+    const e = eventFrom(await c.req.json<EventBody>());
+    if (typeof e === 'string') return c.json({ error: e }, 400);
+    const cal = d.calendar?.();
+    if (!cal) throw new GmailDisconnected();
+    const calendarId = c.req.param('calendarId');
+    if (!(await writableCalendar(cal, calendarId))) return c.json({ error: 'Agenda inconnu ou en lecture seule' }, 400);
+    return c.json(await cal.update(calendarId, c.req.param('eventId'), e));
   });
 
   // Delete an appointment, only from a calendar Calm may write to.

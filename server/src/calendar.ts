@@ -47,6 +47,8 @@ export interface CalendarPort {
   upcoming(days: number): Promise<CalEvent[]>;
   range(from: string, to: string): Promise<CalEvent[]>;
   create(e: NewEvent): Promise<{ link: string }>;
+  /** Changes an appointment in place; fields left out of the form keep their value (reminders when not given). */
+  update(calendarId: string, eventId: string, e: NewEvent): Promise<{ link: string }>;
   /** Deletes an appointment (Google keeps it in the calendar's trash for 30 days). Guests are not notified. */
   remove(calendarId: string, eventId: string): Promise<void>;
 }
@@ -76,6 +78,18 @@ async function guard<T>(p: Promise<T>): Promise<T> {
     if (/invalid_grant|insufficient/i.test(err.message ?? '') || err.status === 401) throw new GmailDisconnected();
     throw e;
   }
+}
+
+/** Google's event body for an appointment from the form. */
+function body(e: NewEvent) {
+  return {
+    summary: e.title,
+    location: e.location ?? undefined,
+    description: e.description || undefined,
+    start: e.allDay ? { date: e.start, dateTime: null } : { dateTime: e.start, timeZone: TIMEZONE, date: null },
+    end: e.allDay ? { date: e.end, dateTime: null } : { dateTime: e.end, timeZone: TIMEZONE, date: null },
+    reminders: e.reminderMin === undefined ? undefined : { useDefault: false, overrides: [{ method: 'popup', minutes: e.reminderMin }] },
+  };
 }
 
 const PRIMARY: CalInfo = { id: 'primary', name: '', color: '#039be5', primary: true, writable: true };
@@ -142,19 +156,11 @@ export function createCalendarPort(auth: OAuth2Client): CalendarPort {
       return perCalendar.flat().sort((x, y) => x.start.localeCompare(y.start));
     },
     async create(e) {
-      const res = await guard(
-        api.events.insert({
-          calendarId: e.calendarId ?? 'primary',
-          requestBody: {
-            summary: e.title,
-            location: e.location ?? undefined,
-            description: e.description || undefined,
-            start: e.allDay ? { date: e.start } : { dateTime: e.start, timeZone: TIMEZONE },
-            end: e.allDay ? { date: e.end } : { dateTime: e.end, timeZone: TIMEZONE },
-            reminders: e.reminderMin === undefined ? undefined : { useDefault: false, overrides: [{ method: 'popup', minutes: e.reminderMin }] },
-          },
-        }),
-      );
+      const res = await guard(api.events.insert({ calendarId: e.calendarId ?? 'primary', requestBody: body(e) }));
+      return { link: res.data.htmlLink ?? '' };
+    },
+    async update(calendarId, eventId, e) {
+      const res = await guard(api.events.patch({ calendarId, eventId, sendUpdates: 'none', requestBody: { ...body(e), location: e.location ?? '', description: e.description ?? '' } }));
       return { link: res.data.htmlLink ?? '' };
     },
     async remove(calendarId, eventId) {

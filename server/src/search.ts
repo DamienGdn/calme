@@ -4,6 +4,12 @@ import type { GmailPort } from './gmail.ts';
 import { decodeEntities, parseAddress } from './mime.ts';
 import { TIMEZONE } from './calendar.ts';
 
+/** A themed part of the answer: a short title and short points (light **bold** markup). */
+export interface AnswerSection {
+  title: string;
+  points: string[];
+}
+
 export interface SearchResult {
   id: string;
   fromName: string;
@@ -29,7 +35,7 @@ export async function searchMail(
   g: GmailPort | null,
   question: string,
   archive?: Archive,
-): Promise<{ query: string; explanation: string; lead: string; answer: string; points: string[]; results: SearchResult[] }> {
+): Promise<{ query: string; explanation: string; lead: string; sections: AnswerSection[]; points: string[]; results: SearchResult[] }> {
   const q1 = (await r({
     system: `Tu traduis une question en français en requête de recherche Gmail (opérateurs from:, to:, subject:, has:attachment, filename:, after:YYYY/MM/DD, before:, newer_than:, older_than:, label:, is:unread, OR, guillemets, -exclusion). Aujourd’hui : ${today()}. Préfère une requête large plutôt que trop précise ; mots-clés en français et variantes utiles. keywords : 3 à 8 mots-clés simples (noms, lieux, sujets, synonymes) pour une recherche plein texte locale.`,
     prompt: `Question : ${clean(question)}`,
@@ -81,24 +87,39 @@ export async function searchMail(
     }),
   );
   const results = [...local, ...remote];
-  if (!results.length) return { query, explanation: String(q1?.explanation ?? ''), lead: 'Aucun mail ne correspond à cette recherche.', answer: '', points: [], results };
+  if (!results.length) return { query, explanation: String(q1?.explanation ?? ''), lead: 'Aucun mail ne correspond à cette recherche.', sections: [], points: [], results };
 
   const listing = results
     .map((m) => `<mail id="${m.id}">De : ${clean(m.fromName)} <${m.fromEmail}> · ${new Date(m.date).toISOString().slice(0, 10)} · Objet : ${clean(m.subject)}\n${clean(m.excerpt ?? m.snippet)}</mail>`)
     .join('\n');
   const q2 = (await r({
-    system: `Tu réponds à la question de l’utilisateur à partir de TOUS les mails trouvés (expéditeur, date, objet, extrait). ${UNTRUSTED} Réponds en français. lead : une seule phrase courte qui répond directement à la question. answer : le détail, en 1 à 3 paragraphes courts séparés par une ligne vide, qui couvrent l’ensemble des mails pertinents, pas seulement le premier ; mets en gras avec deux astérisques (**…**) les dates, montants, noms et références clés, sans autre mise en forme. points : si plusieurs mails comptent, une chronologie de 3 à 8 points courts « date — fait », du plus ancien au plus récent (sinon une liste vide). Si les extraits ne suffisent pas, dis-le et indique les mails à ouvrir. relevantIds : les ids de tous les mails qui comptent pour la réponse.`,
+    system: `Tu réponds à la question de l’utilisateur à partir de TOUS les mails trouvés (expéditeur, date, objet, extrait). ${UNTRUSTED} Réponds en français. lead : une seule phrase courte qui répond directement à la question. sections : le détail, rangé en 1 à 4 rubriques thématiques (par exemple « Terrain et notaire », « Prêt », « Permis ») qui couvrent l’ensemble des mails pertinents, pas seulement le premier ; chaque rubrique a un titre de 1 à 4 mots et 2 à 6 points très courts (une seule idée par point, pas de phrase longue) ; mets en gras avec deux astérisques (**…**) les dates, montants, noms et références clés, sans autre mise en forme. points : si plusieurs mails comptent, une chronologie de 3 à 8 points courts « date — fait », du plus ancien au plus récent (sinon une liste vide). Si les extraits ne suffisent pas, dis-le et indique les mails à ouvrir. relevantIds : les ids de tous les mails qui comptent pour la réponse.`,
     prompt: `Question : ${clean(question)}\n\nMails trouvés (${results.length}) :\n${listing}`,
     schema: {
       type: 'object',
-      properties: { lead: { type: 'string' }, answer: { type: 'string' }, points: { type: 'array', items: { type: 'string' } }, relevantIds: { type: 'array', items: { type: 'string' } } },
-      required: ['lead', 'answer', 'points', 'relevantIds'],
+      properties: {
+        lead: { type: 'string' },
+        sections: {
+          type: 'array',
+          items: { type: 'object', properties: { title: { type: 'string' }, points: { type: 'array', items: { type: 'string' } } }, required: ['title', 'points'] },
+        },
+        points: { type: 'array', items: { type: 'string' } },
+        relevantIds: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['lead', 'sections', 'points', 'relevantIds'],
     },
-  })) as { lead?: string; answer?: string; points?: string[]; relevantIds?: string[] };
+  })) as { lead?: string; sections?: { title?: unknown; points?: unknown }[]; points?: string[]; relevantIds?: string[] };
   const relevant = new Set((q2?.relevantIds ?? []).map(String));
   const ranked = results
     .map(({ excerpt: _e, ...m }) => ({ ...m, relevant: relevant.has(m.id) }))
     .sort((a, b) => Number(b.relevant) - Number(a.relevant) || Number(b.source === 'local') - Number(a.source === 'local') || b.date - a.date);
   const points = (Array.isArray(q2?.points) ? q2.points : []).map(String).filter(Boolean).slice(0, 8);
-  return { query, explanation: String(q1?.explanation ?? ''), lead: String(q2?.lead ?? ''), answer: String(q2?.answer ?? ''), points, results: ranked };
+  const sections = (Array.isArray(q2?.sections) ? q2.sections : [])
+    .map((sec) => ({
+      title: String(sec?.title ?? '').trim().slice(0, 60),
+      points: (Array.isArray(sec?.points) ? sec.points : []).map((p) => String(p).trim().slice(0, 300)).filter(Boolean).slice(0, 8),
+    }))
+    .filter((sec) => sec.title && sec.points.length)
+    .slice(0, 5);
+  return { query, explanation: String(q1?.explanation ?? ''), lead: String(q2?.lead ?? ''), sections, points, results: ranked };
 }

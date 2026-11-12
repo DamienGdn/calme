@@ -23,7 +23,8 @@ interface SearchResponse {
   explanation: string;
   /** One short sentence that answers directly (may hold **bold**). */
   lead?: string;
-  answer: string;
+  /** The detail, by theme: a title and short points (may hold **bold**). */
+  sections?: { title: string; points: string[] }[];
   /** Short timeline "date — fact" when several mails matter. */
   points?: string[];
   results: Result[];
@@ -45,12 +46,21 @@ const point = (p: string) => {
   const m = /^(.{2,24}?)\s+[—–-]\s+(.+)$/.exec(p);
   return m ? { date: m[1], text: m[2] } : { date: '', text: p };
 };
-/** The detail folds after a few lines; the timeline folds behind its title. */
-const expanded = ref(false);
+/** Each themed section folds as a whole (the first one open); nothing is cut in the middle of a sentence. */
 const lead = computed(() => (res.value?.lead ? richText(res.value.lead)[0] ?? [] : []));
-const answerParas = computed(() => richText(res.value?.answer ?? ''));
-const longAnswer = computed(() => (res.value?.answer.length ?? 0) > 260);
-watch(res, () => (expanded.value = false));
+const inline = (s: string) => richText(s)[0] ?? [];
+const openSections = ref<Set<number>>(new Set([0]));
+watch(res, () => (openSections.value = new Set([0])));
+const allOpen = computed(() => (res.value?.sections?.length ?? 0) > 0 && openSections.value.size === res.value!.sections!.length);
+function toggleAll() {
+  openSections.value = allOpen.value ? new Set() : new Set((res.value?.sections ?? []).map((_, i) => i));
+}
+function onToggle(i: number, e: Event) {
+  const next = new Set(openSections.value);
+  if ((e.target as HTMLDetailsElement).open) next.add(i);
+  else next.delete(i);
+  openSections.value = next;
+}
 function read(r: Result) {
   if (phone.value && !open.value) history.pushState({ calmReading: true }, '');
   open.value = r;
@@ -130,14 +140,17 @@ onBeforeUnmount(() => window.removeEventListener('popstate', onPop));
       <p v-if="lead.length" class="answer-lead">
         <template v-for="(s, i) in lead" :key="i"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template>
       </p>
-      <div v-if="answerParas.length" id="answer-body" :class="['answer', { clamped: longAnswer && !expanded }]">
-        <p v-for="(para, i) in answerParas" :key="i">
-          <template v-for="(s, j) in para" :key="j"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template>
-        </p>
+      <div v-if="res.sections?.length" class="answer-sections">
+        <button v-if="res.sections.length > 1" type="button" class="linkish fold" @click="toggleAll">{{ allOpen ? t('search.foldAll') : t('search.openAll') }}</button>
+        <details v-for="(sec, i) in res.sections" :key="i" class="answer-sec" :open="openSections.has(i)" @toggle="onToggle(i, $event)">
+          <summary><span>{{ sec.title }}</span><span class="mono muted">{{ sec.points.length }}</span></summary>
+          <ul>
+            <li v-for="(p, j) in sec.points" :key="j">
+              <template v-for="(s, k) in inline(p)" :key="k"><strong v-if="s.bold">{{ s.text }}</strong><template v-else>{{ s.text }}</template></template>
+            </li>
+          </ul>
+        </details>
       </div>
-      <button v-if="longAnswer" type="button" class="linkish fold" :aria-expanded="expanded" aria-controls="answer-body" @click="expanded = !expanded">
-        {{ expanded ? t('search.readLess') : t('search.readMore') }}
-      </button>
       <details v-if="res.points?.length" class="points-box">
         <summary>{{ t('search.timeline', { n: res.points.length }) }}</summary>
         <ol class="points">
