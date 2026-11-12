@@ -1126,3 +1126,5 @@ html.kb-open .fab { display: none; }
 .nl2-choice button[aria-checked='true'] { white-space: nowrap; }
 .nl2.both .nl2-choice button[aria-checked='true'] { background: var(--hot); color: #0d0e11; }
 @media (max-width: 720px) { .nl2-choice { width: 100%; } .nl2-choice button { flex: 1; padding: 0 6px; font-size: 12px; } }
+.mail-link { align-self: flex-start; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 15px; font-weight: 600; color: var(--accent-text); text-decoration: none; }
+.mail-link:hover { text-decoration: underline; text-underline-offset: 3px; }

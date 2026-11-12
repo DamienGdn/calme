@@ -43,3 +43,12 @@ export function actionLink(action: string, html: string, text: string): ActionLi
   }
   return best ? { url: best.url, label: best.label, host: best.host } : null;
 }
+
+/** The action's link, else one matching what Calm read in the mail (its summary). */
+export function mailLink(a: { action: string; summary: string[] } | null | undefined, html: string, text: string): (ActionLink & { via: 'action' | 'summary' }) | null {
+  if (!a) return null;
+  const byAction = actionLink(a.action, html, text);
+  if (byAction) return { ...byAction, via: 'action' };
+  const bySummary = actionLink(a.summary.join(' '), html, text);
+  return bySummary ? { ...bySummary, via: 'summary' } : null;
+}

@@ -88,8 +88,11 @@ function eventDate(start: string, end: string) {
       <ol>
         <li v-for="(s, i) in a.summary" :key="i"><span>0{{ i + 1 }}</span><span>{{ s }}</span></li>
       </ol>
-      <a v-if="a.action && actionLinks.get(mail.id)" class="act act-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">→ {{ a.action }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }} ↗</span></a>
+      <a v-if="a.action && actionLinks.get(mail.id)?.via !== 'summary' && actionLinks.get(mail.id)" class="act act-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">→ {{ a.action }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }} ↗</span></a>
       <span v-else-if="a.action" class="act">→ {{ a.action }}</span>
+      <a v-if="actionLinks.get(mail.id)?.via === 'summary'" class="mail-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">
+        ↗ {{ actionLinks.get(mail.id)!.label }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }}</span>
+      </a>
       <div v-if="kinds.length" class="act-buttons">
         <button v-if="kinds.includes('unsub')" type="button" class="btn btn-prim" :disabled="unsub.status.value !== 'idle'" @click="unsub.go()">
           <Icon name="unsub" :size="16" /> {{ unsub.status.value === 'done' ? t('reader.unsubscribed') : unsub.status.value === 'busy' ? t('reader.unsubscribing') : t('reader.unsubscribe') }}

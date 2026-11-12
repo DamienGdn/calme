@@ -132,7 +132,7 @@ export function when(ts: number): string {
 
 /** Full text of a mail, loaded when it is opened (the list only carries headers). */
 /** The mail's own link behind Calm's suggested action, by mail id (filled when the mail is opened). */
-export const actionLinks = reactive(new Map<string, { url: string; label: string; host: string } | null>());
+export const actionLinks = reactive(new Map<string, { url: string; label: string; host: string; via?: 'action' | 'summary' } | null>());
 
 export function useMailBody(id: Ref<string | undefined>, source: Ref<'inbox' | 'archive' | 'gmail'> = ref('inbox')) {
   const body = ref<string | null>(null);
@@ -145,7 +145,7 @@ export function useMailBody(id: Ref<string | undefined>, source: Ref<'inbox' | '
       onCleanup(() => (alive = false));
       const path = src === 'archive' ? '/api/archive/' : src === 'gmail' ? '/api/gmail/' : '/api/mail/';
       try {
-        const m = await api<MailView & { actionLink?: { url: string; label: string; host: string } | null }>(path + encodeURIComponent(mailId));
+        const m = await api<MailView & { actionLink?: { url: string; label: string; host: string; via?: 'action' | 'summary' } | null }>(path + encodeURIComponent(mailId));
         if (alive) body.value = m.text;
         if (m.actionLink !== undefined) actionLinks.set(mailId, m.actionLink);
       } catch {

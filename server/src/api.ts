@@ -11,7 +11,7 @@ import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
 import { safeMailHtml } from './mailHtml.ts';
 import { decodeEntities, fixMojibake, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
-import { actionLink } from './links.ts';
+import { mailLink } from './links.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
@@ -372,7 +372,7 @@ export function createApp(d: Deps) {
     if (!m) return c.json({ error: 'Mail introuvable' }, 404);
     const { html: _html, ...rest } = m;
     // Mails stored before the accent repair (mime.ts) are put right when shown.
-    return c.json({ ...rest, text: fixMojibake(rest.text), subject: fixMojibake(rest.subject), actionLink: actionLink(m.analysis?.action ?? '', m.html ?? '', m.text) });
+    return c.json({ ...rest, text: fixMojibake(rest.text), subject: fixMojibake(rest.subject), actionLink: mailLink(m.analysis, m.html ?? '', m.text) });
   });
 
   // The mail's formatted version, cleaned (mailHtml.ts). Mails stored before Calm kept HTML get it from Gmail once.
