@@ -96,4 +96,36 @@ async function restartAgent(label = LABEL) {
   if (!r.ok) throw new Error('launchctl kickstart failed');
 }
 
-module.exports = { LABEL, agentPlist, agentStatus, installAgent, uninstallAgent, restartAgent, plistPath };
+/**
+ * Memory (resident, in KB) of a process and all it started, from `ps -A -o pid=,ppid=,rss=`: the server plus
+ * caffeinate and the Claude runs of a triage in progress.
+ */
+function treeMemory(psOutput, rootPid) {
+  const rows = psOutput
+    .split('\n')
+    .map((l) => l.trim().split(/\s+/).map(Number))
+    .filter((r) => r.length === 3 && r.every(Number.isFinite));
+  const children = new Map();
+  for (const [pid, ppid] of rows) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  const rss = new Map(rows.map(([pid, , kb]) => [pid, kb]));
+  let rssKb = 0;
+  let processes = 0;
+  const stack = rss.has(rootPid) ? [rootPid] : [];
+  while (stack.length) {
+    const pid = stack.pop();
+    rssKb += rss.get(pid) ?? 0;
+    processes++;
+    stack.push(...(children.get(pid) ?? []));
+  }
+  return { rssKb, processes };
+}
+
+/** Memory of the server's process tree right now, or null when it cannot be read. */
+function serverMemory(rootPid) {
+  return new Promise((resolve) => {
+    if (!rootPid) return resolve(null);
+    execFile('/bin/ps', ['-A', '-o', 'pid=,ppid=,rss='], { timeout: 5000 }, (err, out) => resolve(err ? null : treeMemory(String(out), rootPid)));
+  });
+}
+
+module.exports = { LABEL, agentPlist, agentStatus, installAgent, uninstallAgent, restartAgent, plistPath, treeMemory, serverMemory };

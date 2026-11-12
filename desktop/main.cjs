@@ -148,6 +148,7 @@ async function serverStatus() {
     up: await serverUp(),
     mode: a.loaded ? 'background' : server ? 'app' : 'other',
     pid: a.loaded ? a.pid : (server?.pid ?? null),
+    memory: await agent.serverMemory(a.loaded ? a.pid : (server?.pid ?? null)),
     log: path.join(CALME_HOME, 'server.log'),
   };
 }

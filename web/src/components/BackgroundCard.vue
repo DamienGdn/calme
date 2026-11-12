@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { ServerStatus } from '../api.ts';
+import { dateLocale } from '../i18n.ts';
 import { notifyError } from '../store.ts';
 
 /**
@@ -35,6 +36,7 @@ async function run(kind: 'switch' | 'restart', job: () => Promise<ServerStatus |
     void load();
   }
 }
+const mb = (kb: number) => Math.round(kb / 1024).toLocaleString(dateLocale());
 const toggle = (on: boolean) => run('switch', () => desk?.setBackground?.(on));
 const restart = () => run('restart', () => desk?.restartServer?.());
 </script>
@@ -49,6 +51,9 @@ const restart = () => run('restart', () => desk?.restartServer?.());
         <b>{{ status.up ? t('background.up') : t('background.down') }}</b>
         <span class="muted"> · {{ t(`background.mode.${status.mode}`) }}<template v-if="status.pid"> · pid {{ status.pid }}</template></span>
       </span>
+    </p>
+    <p v-if="status.memory" class="muted" style="margin: 0; font-size: 13px">
+      {{ t('background.memory', { mb: mb(status.memory.rssKb), n: status.memory.processes }, status.memory.processes) }}
     </p>
     <label class="switch">
       <input type="checkbox" :checked="status.background" :disabled="Boolean(busy)" @change="toggle(($event.target as HTMLInputElement).checked)" />

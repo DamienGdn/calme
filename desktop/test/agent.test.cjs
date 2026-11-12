@@ -32,3 +32,10 @@ test('keeping the computer awake wraps the server in caffeinate', () => {
 test('paths are escaped for XML', () => {
   assert.match(agentPlist({ ...base, keepAwake: false, logFile: '/Users/a&b/<x>.log' }), /\/Users\/a&amp;b\/&lt;x&gt;\.log/);
 });
+
+test('the memory of the server counts it and everything it started (caffeinate, Claude runs), not the rest', () => {
+  const { treeMemory } = require('../agent.cjs');
+  const ps = ['  1     0  9000', '500     1  1200', '501   500 180000', '502   501  90000', '503     1  70000', '504   502   500'].join('\n');
+  assert.deepEqual(treeMemory(ps, 500), { rssKb: 271700, processes: 4 });
+  assert.deepEqual(treeMemory(ps, 999), { rssKb: 0, processes: 0 });
+});

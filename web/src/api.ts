@@ -53,6 +53,8 @@ export interface ServerStatus {
   up: boolean;
   mode: 'background' | 'app' | 'other';
   pid: number | null;
+  /** Resident memory of the server and what it started (caffeinate, Claude runs), in KB. */
+  memory: { rssKb: number; processes: number } | null;
   log: string;
 }
 
