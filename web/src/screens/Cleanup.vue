@@ -9,8 +9,10 @@ const { t } = useI18n();
 const host = (u: string) => new URL(u).hostname;
 const view = ref<CleanupView | null>(null);
 const offGroups = ref(new Set<string>());
-const unsub = ref(new Set<string>());
-const alsoTrashNews = ref(true);
+/** Per newsletter sender: keep, delete its mails, or delete them and unsubscribe (when the sender offers a link). */
+type Choice = 'keep' | 'trash' | 'both';
+const choice = ref(new Map<string, Choice>());
+const unsub = computed(() => new Set([...choice.value].filter(([, c]) => c === 'both').map(([e]) => e)));
 const busy = ref(false);
 const toOpen = ref<string[]>([]);
 
@@ -19,7 +21,7 @@ async function load() {
     const v = await api<CleanupView>('/api/cleanup');
     view.value = v;
     offGroups.value = new Set();
-    unsub.value = new Set(v.newsletters.filter((n) => n.canUnsub).map((n) => n.fromEmail));
+    choice.value = new Map(v.newsletters.map((n) => [n.fromEmail, n.canUnsub ? 'both' : 'keep']));
   } catch (e) {
     notifyError(e);
   }
@@ -27,12 +29,18 @@ async function load() {
 // Kept alive between tabs (App.vue): fresh data each time the screen comes back.
 onActivated(load);
 
+const setChoice = (email: string, c: Choice) => {
+  const next = new Map(choice.value);
+  next.set(email, c);
+  choice.value = next;
+};
+const CHOICES: Choice[] = ['keep', 'trash', 'both'];
 const toggle = (set: Set<string>, v: string) => (set.has(v) ? set.delete(v) : set.add(v));
 const groups = computed(() => view.value?.groups ?? []);
 const news = computed(() => view.value?.newsletters ?? []);
 const trashIds = computed(() => [
   ...groups.value.filter((g) => !offGroups.value.has(g.group)).flatMap((g) => g.ids),
-  ...(alsoTrashNews.value ? news.value.filter((n) => unsub.value.has(n.fromEmail)).flatMap((n) => n.ids) : []),
+  ...news.value.filter((n) => choice.value.get(n.fromEmail) !== 'keep').flatMap((n) => n.ids),
 ]);
 
 async function apply() {
@@ -92,20 +100,27 @@ async function apply() {
   <section v-if="news.length" style="display: flex; flex-direction: column; gap: 14px" aria-labelledby="nl-title">
     <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
       <h2 id="nl-title" class="eyebrow" style="margin: 0; font-weight: 500; flex: 1">{{ t('cleanup.newsTitle') }}</h2>
-      <label style="display: flex; align-items: center; gap: 8px; font-size: 13px">
-        <input v-model="alsoTrashNews" type="checkbox" style="width: 18px; height: 18px; accent-color: var(--accent)" /> {{ t('cleanup.alsoTrash') }}
-      </label>
     </div>
-    <div class="table">
-      <label v-for="n in news" :key="n.fromEmail" class="nl">
-        <input type="checkbox" :checked="unsub.has(n.fromEmail)" :disabled="!n.canUnsub" @change="toggle(unsub, n.fromEmail)" />
-        <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+    <p class="muted" style="margin: 0; font-size: 13px">{{ t('cleanup.choiceHint') }}</p>
+    <div class="nl-list">
+      <div v-for="n in news" :key="n.fromEmail" :class="['nl2', choice.get(n.fromEmail)]">
+        <span class="nl2-who">
           <span class="name">{{ n.fromName }}</span>
-          <span class="mono muted ellipsis" style="font-size: 11px">{{ n.fromEmail }}</span>
+          <span class="mono muted ellipsis" style="font-size: 11px">{{ n.fromEmail }} · {{ t('common.mails', n.count) }}</span>
         </span>
-        <span class="mono" style="font-size: 13px">{{ t('common.mails', n.count) }}</span>
-        <span class="pill">{{ n.canUnsub ? (unsub.has(n.fromEmail) ? t('reader.unsubscribe') : t('cleanup.keep')) : t('cleanup.noLink') }}</span>
-      </label>
+        <div class="tones nl2-choice" role="radiogroup" :aria-label="n.fromName">
+          <button
+            v-for="c in CHOICES"
+            :key="c"
+            type="button"
+            role="radio"
+            :aria-checked="choice.get(n.fromEmail) === c"
+            :disabled="c === 'both' && !n.canUnsub"
+            :title="c === 'both' && !n.canUnsub ? t('cleanup.noLink') : undefined"
+            @click="setChoice(n.fromEmail, c)"
+          >{{ t(`cleanup.choices.${c}`) }}</button>
+        </div>
+      </div>
     </div>
   </section>
 

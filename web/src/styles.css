@@ -1114,3 +1114,15 @@ html.kb-open .fab { display: none; }
 .cost-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .cost-table td { padding: 7px 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 720px) { .cost-tiles { grid-template-columns: 1fr 1fr; } .cost-tile:first-child { grid-column: 1 / -1; } .cost-big { font-size: 26px; } }
+
+/* Clean-up: each newsletter sender gets keep / delete / delete + unsubscribe. */
+.nl-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 18px; background: var(--surf); }
+.nl2 { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.nl2:last-child { border-bottom: 0; }
+.nl2-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 220px; }
+.nl2 .name { font-family: 'Fraunces', Georgia, serif; font-size: 20px; line-height: 1.1; }
+.nl2.keep .name { color: var(--muted); }
+.nl2-choice button[disabled] { opacity: 0.4; cursor: not-allowed; }
+.nl2-choice button[aria-checked='true'] { white-space: nowrap; }
+.nl2.both .nl2-choice button[aria-checked='true'] { background: var(--hot); color: #0d0e11; }
+@media (max-width: 720px) { .nl2-choice { width: 100%; } .nl2-choice button { flex: 1; padding: 0 6px; font-size: 12px; } }
