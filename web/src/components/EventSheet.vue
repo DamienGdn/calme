@@ -2,7 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { dateLocale } from '../i18n.ts';
-import { mapsUrl } from '../maps.ts';
+import { post } from '../api.ts';
+import { directionsUrl, mapsUrl } from '../maps.ts';
+import { currentPosition, positionAllowed } from '../position.ts';
 import Icon from './Icon.vue';
 
 /** An appointment, opened from the agenda: when, which calendar, where (with a map link), notes, Google link. */
@@ -41,8 +43,38 @@ const when = computed(() => {
 });
 const mapUrl = computed(() => mapsUrl(props.event.location ?? ''));
 
+// --- When to leave: from where the user is now, by car, with a traffic margin and time to park (server/src/travel.ts).
+interface Leave { leaveAt: number; driveMin: number; marginMin: number; parkingMin: number; km: number; place: string }
+const leave = ref<Leave | null>(null);
+const leaveState = ref<'idle' | 'locating' | 'error'>('idle');
+const leaveError = ref('');
+/** Timed appointments with a place, from now to a week ahead. */
+const canLeave = computed(() => {
+  const e = props.event;
+  const start = Date.parse(e.start);
+  return Boolean(!e.allDay && e.location?.trim() && start > Date.now() && start - Date.now() < 7 * 86400_000);
+});
+const hm = (ts: number) => new Date(ts).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' });
+const late = computed(() => Boolean(leave.value && leave.value.leaveAt <= Date.now()));
+async function whenToLeave() {
+  leaveState.value = 'locating';
+  try {
+    const from = await currentPosition().catch(() => {
+      throw new Error(t('agenda.leave.noPos'));
+    });
+    leave.value = await post<Leave>('/api/travel', { from, to: props.event.location, start: props.event.start });
+    leaveState.value = 'idle';
+  } catch (e) {
+    leaveError.value = (e as Error).message;
+    leaveState.value = 'error';
+  }
+}
+
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
-onMounted(() => window.addEventListener('keydown', onKey));
+onMounted(async () => {
+  window.addEventListener('keydown', onKey);
+  if (canLeave.value && (await positionAllowed())) void whenToLeave();
+});
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 </script>
 
@@ -63,6 +95,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
         <span>{{ event.location }}</span>
         <a :href="mapUrl" target="_blank" rel="noopener noreferrer">{{ t('agenda.form.seeMap') }} ↗</a>
       </p>
+      <section v-if="canLeave" class="ev-leave" :aria-label="t('agenda.leave.ask')" aria-live="polite">
+        <template v-if="leave">
+          <p :class="['ev-leave-at', { late }]"><Icon name="clock" :size="18" /> {{ late ? t('agenda.leave.late', { time: hm(leave.leaveAt) }) : t('agenda.leave.at', { time: hm(leave.leaveAt) }) }}</p>
+          <p class="muted ev-leave-detail">{{ t('agenda.leave.detail', { drive: leave.driveMin, km: leave.km.toLocaleString(dateLocale()), margin: leave.marginMin, park: leave.parkingMin }) }}</p>
+          <span style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+            <a class="btn" :href="directionsUrl(leave.place)" target="_blank" rel="noopener noreferrer"><Icon name="pin" :size="16" /> {{ t('agenda.leave.route') }}</a>
+            <button type="button" class="btn" @click="whenToLeave"><Icon name="refresh" :size="16" /> {{ t('agenda.leave.again') }}</button>
+          </span>
+          <p class="muted" style="margin: 0; font-size: 12px">{{ t('agenda.leave.note') }}</p>
+        </template>
+        <button v-else type="button" class="btn" :disabled="leaveState === 'locating'" @click="whenToLeave">
+          <Icon name="clock" :size="16" /> {{ leaveState === 'locating' ? t('agenda.leave.locating') : t('agenda.leave.ask') }}
+        </button>
+        <p v-if="leaveState === 'error'" class="ev-warn" style="margin: 0">{{ leaveError }}</p>
+      </section>
       <p v-if="event.fromMail" class="muted" style="margin: 0; font-size: 14px">{{ event.fromMail }}</p>
       <div v-if="event.description" class="ev-desc">{{ event.description }}</div>
       <template v-if="canDelete">

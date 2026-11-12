@@ -22,6 +22,7 @@ import type { Archive } from './archive.ts';
 import { EARLY, openReminders } from './reminders.ts';
 import { openLogos } from './logos.ts';
 import { searchPlaces } from './places.ts';
+import { departure, routeMinutes, validPoint } from './travel.ts';
 import { openUsage } from './usage.ts';
 import { composeMail } from './triage.ts';
 import { CATEGORIES, type Category, type PushSub } from './types.ts';
@@ -809,6 +810,28 @@ export function createApp(d: Deps) {
       return c.json(await searchPlaces(q, d.fetchImpl ?? fetch));
     } catch {
       return c.json({ error: 'Recherche d’adresse indisponible : saisis l’adresse à la main.' }, 502);
+    }
+  });
+
+  // When to leave for an appointment: the user's position (sent by the phone, kept nowhere), the place geocoded,
+  // the car route from IGN, plus a traffic margin and time to park (travel.ts).
+  app.post('/api/travel', async (c) => {
+    const b = await c.req.json().catch(() => null);
+    const to = typeof b?.to === 'string' ? b.to.trim().slice(0, 300) : '';
+    const start = typeof b?.start === 'string' ? Date.parse(b.start) : NaN;
+    if (!validPoint(b?.from) || !to || !Number.isFinite(start)) return c.json({ error: 'Position, lieu ou heure manquant.' }, 400);
+    let dest;
+    try {
+      dest = (await searchPlaces(to, d.fetchImpl ?? fetch)).find((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+    } catch {
+      return c.json({ error: 'Recherche du lieu indisponible pour le moment.' }, 502);
+    }
+    if (!dest) return c.json({ error: 'Lieu introuvable : précise l’adresse du rendez-vous.' }, 404);
+    try {
+      const route = await routeMinutes({ lat: b.from.lat, lon: b.from.lon }, dest, d.fetchImpl ?? fetch);
+      return c.json({ ...departure(start, route.minutes), km: Math.round(route.km * 10) / 10, place: dest.label });
+    } catch {
+      return c.json({ error: 'Calcul d’itinéraire indisponible pour le moment.' }, 502);
     }
   });
 

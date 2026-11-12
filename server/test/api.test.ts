@@ -104,6 +104,7 @@ function setup(gmailConnected = true) {
     fetchImpl: async (url, init) => {
       fetched.push({ url: String(url), init });
       if (String(url) === 'https://shop.fr/apple-touch-icon.png') return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
+      if (String(url).startsWith('https://data.geopf.fr/navigation/itineraire')) return Response.json({ distance: 12.3, duration: 22.4 });
       if (String(url).startsWith('https://photon.komoot.io/api')) {
         if (String(url).includes('panne') || String(url).includes('bancal')) return new Response('down', { status: 503 });
         const poi = (name: string, key: string, value: string, street: string, city: string, postcode: string, country = 'FR') => ({
@@ -948,6 +949,34 @@ describe('address search (Géoplateforme)', () => {
   it('says so when both services are down, so the address can be typed by hand', async () => {
     const { app } = setup();
     expect((await app.request('/api/address?q=rue%20en%20panne', { headers: auth })).status).toBe(502);
+  });
+});
+
+describe('when to leave', () => {
+  const ask = (app: ReturnType<typeof setup>['app'], b: unknown) =>
+    app.request('/api/travel', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(b) });
+
+  it('says when to leave from where the user is, with the drive, a margin and time to park', async () => {
+    const { app, fetched } = setup();
+    const res = await ask(app, { from: { lat: 48.11, lon: -1.68 }, to: 'Leroy Merlin Betton', start: '2026-11-20T14:00:00+01:00' });
+    expect(res.status).toBe(200);
+    // 23 min drive + 5 margin + 10 parking = 38 min before 14:00 → 13:22 → 13:20
+    expect(await res.json()).toEqual({ leaveAt: new Date('2026-11-20T13:20:00+01:00').getTime(), driveMin: 23, marginMin: 5, parkingMin: 10, km: 12.3, place: 'Leroy Merlin, Rue de la Maison Neuve, 35830 Betton' });
+    const route = new URL(fetched.find((f) => f.url.includes('itineraire'))!.url);
+    expect(route.searchParams.get('start')).toBe('-1.68,48.11');
+    expect(route.searchParams.get('end')).toBe('-1.63,48.16');
+  });
+
+  it('refuses a missing position, place or start', async () => {
+    const { app } = setup();
+    expect((await ask(app, { from: { lat: 200, lon: 0 }, to: 'Betton', start: '2026-11-20T14:00:00+01:00' })).status).toBe(400);
+    expect((await ask(app, { from: { lat: 48, lon: -1 }, to: '', start: '2026-11-20T14:00:00+01:00' })).status).toBe(400);
+    expect((await ask(app, { from: { lat: 48, lon: -1 }, to: 'Betton', start: 'demain' })).status).toBe(400);
+  });
+
+  it('says when the place cannot be looked up', async () => {
+    const { app } = setup();
+    expect((await ask(app, { from: { lat: 48, lon: -1 }, to: 'rue en panne', start: '2026-11-20T14:00:00+01:00' })).status).toBe(502);
   });
 });
 

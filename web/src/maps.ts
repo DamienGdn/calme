@@ -9,3 +9,8 @@ export function mapsUrl(place: string, coords?: { lat: number; lon: number } | n
   if (coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lon)) params.set('ll', `${coords.lat},${coords.lon}`);
   return `https://maps.apple.com/?${params}`;
 }
+
+/** The car route to a place, from where you are, in Apple Plans. */
+export function directionsUrl(place: string): string {
+  return `https://maps.apple.com/?${new URLSearchParams({ daddr: place.trim(), dirflg: 'd' })}`;
+}
