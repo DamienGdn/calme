@@ -46,9 +46,25 @@ export interface CleanupView {
   newsletters: { fromName: string; fromEmail: string; count: number; ids: string[]; canUnsub: boolean }[];
 }
 
+/** Where Calm's server runs on the Mac (desktop app only, see desktop/agent.cjs). */
+export interface ServerStatus {
+  available: boolean;
+  background: boolean;
+  up: boolean;
+  mode: 'background' | 'app' | 'other';
+  pid: number | null;
+  log: string;
+}
+
 declare global {
   interface Window {
-    calmeDesktop?: { setToken(token: string): void; platform?: string };
+    calmeDesktop?: {
+      setToken(token: string): void;
+      platform?: string;
+      serverStatus?(): Promise<ServerStatus | null>;
+      setBackground?(on: boolean): Promise<ServerStatus | null>;
+      restartServer?(): Promise<ServerStatus | null>;
+    };
   }
 }
 

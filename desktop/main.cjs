@@ -5,6 +5,7 @@ const { execFileSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const agent = require('./agent.cjs');
 
 // The app was called "Calme" before: its settings (pairing, notifications) stay in that folder.
 app.setPath('userData', path.join(app.getPath('appData'), 'Calme'));
@@ -33,6 +34,7 @@ function loadSettings() {
     loginItemConfigured: Boolean(s.loginItemConfigured),
     notify: s.notify || 'all', // 'all' | 'reply' | 'off'
     keepAwake: s.keepAwake !== false, // the computer must stay awake to fetch mail and serve the iPhone
+    background: s.background === true, // macOS: the server runs as a LaunchAgent, even with the app quit (agent.cjs)
   };
 }
 function saveSettings() {
@@ -48,6 +50,8 @@ let seen = null; // ids already notified; null until the first successful poll
 let counts = { reply: 0, total: 0 };
 let server = null;
 let serverRestarts = 0;
+/** True while the app's own server is stopped on purpose (handed to the background service, or restarted). */
+let handingOver = false;
 let awakeId = null;
 
 /** Keeps the computer from sleeping while Calm runs (the display may still turn off). */
@@ -96,10 +100,113 @@ async function serverUp() {
   }
 }
 
-/** Starts the bundled server with Electron's own Node, restarting it if it stops. */
+const resourcesDir = () => (app.isPackaged ? process.resourcesPath : path.join(__dirname));
+const canBackground = () => process.platform === 'darwin' && isLocal();
+let pathEnv = null;
+const shellPath = () => (pathEnv ??= loginShellPath());
+
+/** The background service's settings: this app's binary and bundled server, so an update reloads it. */
+const agentOptions = () => ({
+  execPath: process.execPath,
+  entry: path.join(resourcesDir(), 'app', 'server.cjs'),
+  webDist: path.join(resourcesDir(), 'app', 'web'),
+  port: new URL(settings.serverUrl).port || '4747',
+  pathEnv: shellPath(),
+  logFile: path.join(CALME_HOME, 'server.log'),
+  keepAwake: settings.keepAwake,
+  version: app.getVersion(),
+  ...(process.env.CALME_HOME ? { home: CALME_HOME } : {}),
+});
+
+const waitFor = async (want) => {
+  for (let i = 0; i < 60; i++) {
+    if ((await serverUp()) === want) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return false;
+};
+
+/** Stops the server this app started itself (not the background one), without restarting it. */
+async function stopOwnServer() {
+  if (!server) return;
+  const child = server;
+  handingOver = true;
+  await new Promise((resolve) => {
+    child.once('exit', resolve);
+    child.kill('SIGTERM');
+    setTimeout(resolve, 5000);
+  });
+  handingOver = false;
+}
+
+/** Where the server runs and whether it answers: for Admin › Background server and the menu. */
+async function serverStatus() {
+  const a = canBackground() ? await agent.agentStatus() : { installed: false, loaded: false, pid: null };
+  return {
+    available: canBackground(),
+    background: settings.background,
+    up: await serverUp(),
+    mode: a.loaded ? 'background' : server ? 'app' : 'other',
+    pid: a.loaded ? a.pid : (server?.pid ?? null),
+    log: path.join(CALME_HOME, 'server.log'),
+  };
+}
+
+/** Turns the background server on or off; the server moves between the app and launchd without changing port. */
+async function setBackground(on) {
+  if (!canBackground()) throw new Error('Only on a Mac with a local server');
+  settings.background = Boolean(on);
+  saveSettings();
+  if (on) {
+    await stopOwnServer();
+    await waitFor(false);
+    await agent.installAgent(agentOptions());
+    await waitFor(true);
+  } else {
+    await agent.uninstallAgent();
+    await waitFor(false);
+    await ensureServer();
+  }
+  lastError = (await serverUp()) ? null : lastError;
+  refreshTray();
+  return serverStatus();
+}
+
+/** Restarts the server wherever it runs (launchd, or the app's own child). */
+async function restartServer() {
+  if (settings.background && canBackground()) {
+    await agent.restartAgent();
+    await waitFor(true);
+  } else {
+    await stopOwnServer();
+    await waitFor(false);
+    await ensureServer();
+  }
+  refreshTray();
+  return serverStatus();
+}
+
+/** Starts the bundled server with Electron's own Node, restarting it if it stops (or the background service). */
 async function ensureServer() {
-  if (!isLocal() || (await serverUp())) return;
-  const resources = app.isPackaged ? process.resourcesPath : path.join(__dirname);
+  if (!isLocal()) return;
+  if (canBackground()) {
+    if (settings.background) {
+      // Written again at each start: an updated app reloads the service with its new server.
+      try {
+        await agent.installAgent(agentOptions());
+      } catch (e) {
+        lastError = `Serveur de fond : ${e.message}`;
+      }
+      if (!(await waitFor(true))) lastError = 'Le serveur de fond ne répond pas (voir le journal du serveur).';
+      return;
+    }
+    if (fs.existsSync(agent.plistPath())) {
+      await agent.uninstallAgent();
+      await waitFor(false);
+    }
+  }
+  if (await serverUp()) return;
+  const resources = resourcesDir();
   const entry = path.join(resources, 'app', 'server.cjs');
   if (!fs.existsSync(entry)) {
     lastError = 'Serveur introuvable dans l’app (lance « pnpm -C desktop bundle »).';
@@ -112,7 +219,7 @@ async function ensureServer() {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       NODE_NO_WARNINGS: '1',
-      PATH: loginShellPath(),
+      PATH: shellPath(),
       CALME_PORT: new URL(settings.serverUrl).port || '4747',
       CALME_WEB_DIST: path.join(resources, 'app', 'web'),
     },
@@ -120,7 +227,7 @@ async function ensureServer() {
   });
   server.on('exit', (code) => {
     server = null;
-    if (quitting) return;
+    if (quitting || handingOver) return;
     lastError = `Le serveur s’est arrêté (code ${code}). Redémarrage…`;
     refreshTray();
     const delay = Math.min(60_000, 2000 * 2 ** serverRestarts++);
@@ -216,14 +323,14 @@ const TEXT = {
     toAnswer: (n) => `${n} à répondre`, none: 'Rien à répondre', many: (n) => `${n} nouveaux mails`,
     open: 'Ouvrir Calm', compose: 'Nouveau message', sync: 'Relever maintenant', notifications: 'Notifications',
     notifyAll: 'Chaque nouveau mail', notifyReply: 'Seulement « À répondre »', notifyOff: 'Désactivées',
-    pairAsk: (n) => `${n} demande l’accès à Calm`, pairBody: 'Ouvre Calm pour autoriser ou refuser.', login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', log: 'Journal du serveur', quit: 'Quitter Calm',
+    pairAsk: (n) => `${n} demande l’accès à Calm`, pairBody: 'Ouvre Calm pour autoriser ou refuser.', login: 'Lancer au démarrage du Mac', awake: 'Garder l’ordinateur éveillé', background: 'Serveur en arrière-plan (même app quittée)', log: 'Journal du serveur', quit: 'Quitter Calm',
   },
   en: {
     cat: { reply: 'To answer', read: 'To read', news: 'Newsletter', trash: 'To delete' },
     toAnswer: (n) => `${n} to answer`, none: 'Nothing to answer', many: (n) => `${n} new mails`,
     open: 'Open Calm', compose: 'New message', sync: 'Fetch mail now', notifications: 'Notifications',
     notifyAll: 'Every new mail', notifyReply: 'Only “To answer”', notifyOff: 'Off',
-    pairAsk: (n) => `${n} is asking for access to Calm`, pairBody: 'Open Calm to allow or refuse.', login: 'Open at login', awake: 'Keep the computer awake', log: 'Server log', quit: 'Quit Calm',
+    pairAsk: (n) => `${n} is asking for access to Calm`, pairBody: 'Open Calm to allow or refuse.', login: 'Open at login', awake: 'Keep the computer awake', background: 'Background server (even with the app quit)', log: 'Server log', quit: 'Quit Calm',
   },
 };
 const tx = () => TEXT[lang] ?? TEXT.en;
@@ -332,8 +439,12 @@ function refreshTray() {
           settings.keepAwake = i.checked;
           saveSettings();
           applyKeepAwake();
+          if (settings.background && canBackground()) void agent.installAgent(agentOptions()).catch(() => {});
         },
       },
+      ...(canBackground()
+        ? [{ label: tx().background, type: 'checkbox', checked: settings.background, click: (i) => void setBackground(i.checked).then(() => win?.reload()).catch(() => refreshTray()) }]
+        : []),
       { label: tx().log, click: () => shell.openPath(path.join(CALME_HOME, 'server.log')) },
       { type: 'separator' },
       { label: tx().quit, click: () => { quitting = true; app.quit(); } },
@@ -360,6 +471,10 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform === 'darwin') icon.setTemplateImage(true);
     tray = new Tray(icon);
     tray.on('click', () => tray.popUpContextMenu());
+    const fromApp = (e) => new URL(e.senderFrame.url).origin === origin();
+    ipcMain.handle('calme:server:status', (e) => (fromApp(e) ? serverStatus() : null));
+    ipcMain.handle('calme:server:background', (e, on) => (fromApp(e) && typeof on === 'boolean' ? setBackground(on) : null));
+    ipcMain.handle('calme:server:restart', (e) => (fromApp(e) ? restartServer() : null));
     ipcMain.on('calme:set-token', (e, token) => {
       if (new URL(e.senderFrame.url).origin !== origin()) return;
       settings.token = token;

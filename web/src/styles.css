@@ -793,6 +793,8 @@ button.tl-ev:hover { background: var(--surf2); }
 .ev-leave-at svg { color: var(--accent-text); flex: none; }
 .ev-leave-at.late, .ev-leave-at.late svg { color: var(--hot-text); }
 .ev-leave-detail { margin: 0; font-size: 13px; line-height: 1.45; }
+.bg-status { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.bg-status .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .ev-park { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .ev-park-choices { display: inline-flex; align-items: center; gap: 4px; }
 .ev-park-choices button { min-width: 40px; min-height: 36px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--surf); color: var(--ink); font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; }

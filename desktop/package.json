@@ -1,13 +1,14 @@
 {
   "name": "calme-desktop",
   "productName": "Calm",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "private": true,
   "description": "Calm — your mail, without the noise.",
   "main": "main.cjs",
   "scripts": {
     "start": "node scripts/bundle-server.mjs && electron .",
     "bundle": "node scripts/bundle-server.mjs",
+    "test": "node --test test/*.test.cjs",
     "dist": "pnpm -C ../web build && node scripts/bundle-server.mjs && electron-builder"
   },
   "build": {
@@ -19,6 +20,7 @@
     },
     "files": [
       "main.cjs",
+      "agent.cjs",
       "preload.cjs",
       "build/icon.png",
       "build/tray*.png",
