@@ -11,7 +11,7 @@ import TabBar from '../components/TabBar.vue';
 import { axis, swipeBack } from '../gestures.ts';
 import { dateLocale } from '../i18n.ts';
 import { enablePush, isSubscribed, pushSupported } from '../push.ts';
-import { goTo, notify, notifyError, openEditor, refresh, setRead, store } from '../store.ts';
+import { goTo, notify, notifyError, openEditor, refresh, setRead, store, syncing, syncNow } from '../store.ts';
 import { closeTab, cycleTab, openTab, pruneTabs, toggleCompare } from '../tabLogic.ts';
 import { tabs, updateTabs, useMedia } from '../tabs.ts';
 import { isUnread } from '../unread.ts';
@@ -317,9 +317,8 @@ onMounted(() => {
 
 async function sync() {
   try {
-    await post('/api/sync');
+    await syncNow();
     notify(t('common.syncStarted'));
-    window.setTimeout(refresh, 1500);
   } catch (e) {
     notifyError(e);
   }
@@ -341,8 +340,8 @@ async function turnOnPush() {
       <span class="eyebrow">{{ meta }}</span>
       <a href="#/menage" class="btn wide-only" :aria-label="t('nav.cleanup')" :title="t('nav.cleanup')"><Icon name="trash" :size="16" /> <span class="wide-only">{{ t('nav.cleanup') }}</span><span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
       <button v-if="!pushOn && canPush" type="button" class="btn" :aria-label="t('triage.enablePush')" @click="turnOnPush"><Icon name="bell" :size="16" /> <span class="wide-only">{{ t('triage.enablePush') }}</span></button>
-      <button type="button" class="btn btn-prim" :disabled="store.state?.running" :aria-label="t('common.sync')" @click="sync">
-        <Icon name="refresh" :size="16" /> <span class="wide-only">{{ store.state?.running ? t('common.syncing') : t('common.sync') }}</span>
+      <button type="button" class="btn btn-prim" :disabled="store.state?.running || syncing" :aria-label="t('common.sync')" @click="sync">
+        <Icon name="refresh" :size="16" /> <span class="wide-only">{{ store.state?.running || syncing ? t('common.syncing') : t('common.sync') }}</span>
       </button>
     </header>
 

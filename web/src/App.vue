@@ -23,7 +23,7 @@ import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
 import { glassBackdrop } from './glass.ts';
-import { draft, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
+import { draft, parseHash, refresh, runToastAction, store, syncing, type Route } from './store.ts';
 
 const version = __APP_VERSION__;
 /** Access requests from other screens are approved only on the computer running Calm. */
@@ -191,7 +191,7 @@ watch(
 const initial = computed(() => (account.value?.name || account.value?.email || 'C').trim().charAt(0).toUpperCase());
 const onMenuKey = (e: KeyboardEvent) => e.key === 'Escape' && (menuOpen.value = false);
 const depth = (name: string) => name.split('/').length - 1;
-/** Calm is working: a sync or triage on the server, or a request the user waits on (shown after 300 ms, so quick ones don't flash). */
+/** Calm is working: a sync asked here or running on the server, a triage, or a request the user waits on (shown after 300 ms, so quick ones don't flash). */
 const waiting = ref(false);
 let waitTimer: ReturnType<typeof setTimeout> | undefined;
 watch(activity, (n) => {
@@ -199,7 +199,7 @@ watch(activity, (n) => {
   if (n > 0) waitTimer = setTimeout(() => (waiting.value = true), 300);
   else waiting.value = false;
 });
-const busy = computed(() => Boolean(store.state?.running || store.state?.analyzing || waiting.value));
+const busy = computed(() => Boolean(store.state?.running || store.state?.analyzing || syncing.value || waiting.value));
 </script>
 
 <template>

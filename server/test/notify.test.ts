@@ -63,6 +63,19 @@ describe('notifier', () => {
     expect(JSON.parse(sent[0])).toMatchObject({ title: 'Sophie Martin', body: 'Dîner samedi ?', badge: 0 });
   });
 
+  it('puts the number of mails to answer on the icon, not the unread count', async () => {
+    const s = openStore(':memory:');
+    s.upsertMessages([mail('a'), mail('b', { labelIds: ['INBOX', 'UNREAD'] }), mail('c', { labelIds: ['INBOX', 'UNREAD'] })]);
+    s.saveAnalyses([reply('a'), { ...reply('b'), category: 'news' }]);
+    s.addPushSub({ endpoint: 'https://push/1', keys: { p256dh: 'k', auth: 'a' } });
+    const sent: string[] = [];
+    const n = createNotifier(s, vapid, async (_sub, payload) => {
+      sent.push(payload);
+    });
+    await n.test('https://push/1');
+    expect(JSON.parse(sent[0]).badge).toBe(1);
+  });
+
   it('groups more than 3 replies into a single push', async () => {
     const s = openStore(':memory:');
     s.upsertMessages(['a', 'b', 'c', 'd'].map((id) => mail(id)));

@@ -42,9 +42,9 @@ export function createNotifier(
   const sender: PushSender =
     send ?? ((sub, payload) => sendNotification(sub, payload, { vapidDetails: { subject, ...vapid }, TTL: 3600 }));
 
-  /** Each push also carries the number of unread mails, shown on the app icon (iPhone home screen). */
+  /** Each push also carries the number of mails to answer, shown on the app icon (iPhone home screen). */
   async function push(payloads: { title: string; body: string; url: string }[]) {
-    const badge = s.listInbox().filter((m) => m.labelIds?.includes('UNREAD')).length;
+    const badge = s.counts().reply;
     for (const sub of s.listPushSubs()) {
       for (const p of payloads) {
         try {
@@ -106,7 +106,7 @@ export function createNotifier(
       const sub = s.listPushSubs().find((x) => x.endpoint === endpoint);
       if (!sub) return false;
       const en = getSettings(s, { model: '', intervalMin: 0 }).language === 'en';
-      const badge = s.listInbox().filter((m) => m.labelIds?.includes('UNREAD')).length;
+      const badge = s.counts().reply;
       await sender(sub, JSON.stringify({ title: 'Calm', body: en ? 'Notifications work on this device.' : 'Les notifications fonctionnent sur cet appareil.', url: '/', badge }));
       return true;
     },

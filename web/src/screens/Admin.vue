@@ -11,7 +11,7 @@ import CalendarsCard from '../components/CalendarsCard.vue';
 import QuotaGauge from '../components/QuotaGauge.vue';
 import { canRefract } from '../glass.ts';
 import { dateLocale, setLang, type Lang } from '../i18n.ts';
-import { GLASS_DEFAULT, GLASS_MAX, notify, notifyError, refresh, setGlass, setThemePref, store, type Glass, type ThemePref } from '../store.ts';
+import { GLASS_DEFAULT, GLASS_MAX, notify, notifyError, refresh, setGlass, setThemePref, store, syncNow, type Glass, type ThemePref } from '../store.ts';
 
 const version = __APP_VERSION__;
 const THEMES: ThemePref[] = ['system', 'light', 'dark'];
@@ -102,13 +102,10 @@ async function runTest() {
   test.value = await post<{ ok: boolean; ms: number; error?: string }>('/api/admin/claude-test').catch((e) => ({ ok: false, ms: 0, error: (e as Error).message }));
 }
 
-async function syncNow() {
-  await post('/api/sync').catch(() => {});
+async function sync() {
+  await syncNow().catch(() => {});
   notify(t('common.syncStarted'));
-  window.setTimeout(() => {
-    void load();
-    void refresh();
-  }, 2000);
+  window.setTimeout(() => void load(), 2000);
 }
 
 
@@ -230,7 +227,7 @@ const fmtDate = (ts: number) => new Date(ts).toLocaleDateString(dateLocale(), { 
         </dl>
         <QuotaGauge />
         <p class="muted" style="margin: 0; font-size: 12px; line-height: 1.5">{{ t('admin.quotaNote') }}</p>
-        <button type="button" class="btn btn-prim" style="align-self: flex-start" @click="syncNow"><Icon name="refresh" :size="16" /> {{ t('admin.syncNow') }}</button>
+        <button type="button" class="btn btn-prim" style="align-self: flex-start" @click="sync"><Icon name="refresh" :size="16" /> {{ t('admin.syncNow') }}</button>
       </section>
 
       <section class="card" aria-labelledby="a-archive">

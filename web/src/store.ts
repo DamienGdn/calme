@@ -83,7 +83,7 @@ export const notifyError = (e: unknown) => notify((e as Error).message, true);
 export async function refresh() {
   try {
     store.state = await api<AppState>('/api/state');
-    showBadge(store.state.emails.filter(isUnread).length);
+    showBadge(store.state.counts.reply);
     showAlerts(store.state.alerts ?? []);
   } catch (e) {
     if (e instanceof Unauthorized) {
@@ -91,6 +91,33 @@ export async function refresh() {
       store.paired = false;
     }
   }
+}
+
+/**
+ * Asks the server for a sync now, then follows it: `syncing` stays on (Calm's mark pulses) until the cycle is over,
+ * checked every second for three minutes at most. Resolves once the server has the request.
+ */
+export const syncing = ref(false);
+export async function syncNow() {
+  if (syncing.value) return;
+  syncing.value = true;
+  try {
+    await post('/api/sync');
+  } catch (e) {
+    syncing.value = false;
+    throw e;
+  }
+  void (async () => {
+    const end = Date.now() + 180_000;
+    try {
+      do {
+        await new Promise((r) => setTimeout(r, 1000));
+        await refresh();
+      } while (store.state?.running && Date.now() < end);
+    } finally {
+      syncing.value = false;
+    }
+  })();
 }
 
 /**
@@ -130,7 +157,7 @@ function showAlerts(list: { id: string; title: string; body: string; at: number 
   notify(`${last.title} — ${last.body}${fresh.length > 1 ? ` (+${fresh.length - 1})` : ''}`, false, { label: i18n.global.t('remind.see'), run: () => goTo('rappels') });
 }
 
-/** Unread mails on the app icon (home-screen app; ignored where the Badging API is missing). */
+/** Mails to answer on the app icon (home-screen app; ignored where the Badging API is missing). */
 function showBadge(n: number) {
   const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
   void (n > 0 ? nav.setAppBadge?.(n) : nav.clearAppBadge?.())?.catch(() => {});
