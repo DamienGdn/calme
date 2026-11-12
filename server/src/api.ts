@@ -295,10 +295,27 @@ export function createApp(d: Deps) {
 
   // Folders (Gmail labels): created and deleted from Calm. Deleting one never deletes mail: its mails first go to
   // another folder or back to the inbox when asked, otherwise they stay in Gmail's "All mail".
-  app.post('/api/labels', async (c) => {
-    const { name } = await c.req.json<{ name?: unknown }>();
+  const folderName = (name: unknown) => {
     const clean = typeof name === 'string' ? name.trim().replace(/\s*\/\s*/g, '/').replace(/^\/+|\/+$/g, '') : '';
-    if (!clean || clean.length > 200) return c.json({ error: 'Nom de dossier invalide' }, 400);
+    return clean && clean.length <= 200 ? clean : null;
+  };
+
+  // "Ranger dans Factures": the mail goes to that folder (found whatever its case), made first when missing.
+  app.post('/api/mail/:id/file', async (c) => {
+    const clean = folderName((await c.req.json<{ name?: unknown }>()).name);
+    if (!clean) return c.json({ error: 'Nom de dossier invalide' }, 400);
+    const id = c.req.param('id');
+    if (!store.getMail(id)) return c.json({ error: 'Mail introuvable' }, 404);
+    const g = gmail();
+    const found = (await g.listLabels()).find((l) => l.name.toLowerCase() === clean.toLowerCase());
+    const target = found ?? (await g.createLabel(clean));
+    await label(g, store, id, target.id);
+    return c.json({ ok: true, labelId: target.id, name: target.name, created: !found });
+  });
+
+  app.post('/api/labels', async (c) => {
+    const clean = folderName((await c.req.json<{ name?: unknown }>()).name);
+    if (!clean) return c.json({ error: 'Nom de dossier invalide' }, 400);
     const g = gmail();
     if ((await g.listLabels()).some((l) => l.name.toLowerCase() === clean.toLowerCase())) return c.json({ error: 'Ce dossier existe déjà' }, 409);
     return c.json(await g.createLabel(clean));

@@ -259,6 +259,8 @@ async function act(mail: MailItem | null, path: string, done: string, body?: unk
     busy.value = false;
   }
 }
+/** Files the mail in the folder Calm's action names (made when missing), then the folder lists reload. */
+const fileIn = (m: MailItem | null, name: string) => act(m, 'file', t('reader.filedIn', { name }), { name }).then(() => store.labelsVersion++);
 const trash = (m: MailItem | null) => m && act(m, 'trash', t('triage.trashed', { subject: m.subject || t('common.noSubject') }));
 
 // Keyboard, ignored in fields and on other controls:
@@ -474,6 +476,7 @@ function askCalme() {
           @handled="act(current, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(current, 'label', t('triage.filed', { name }), { labelId: id })"
           @toggle-read="toggleRead(current)"
+          @file="(name) => fileIn(current, name)"
         />
         <Reader
           v-if="second"
@@ -486,6 +489,7 @@ function askCalme() {
           @handled="act(second, 'category', t('triage.handledToast'), { category: 'read' })"
           @label="(id, name) => act(second, 'label', t('triage.filed', { name }), { labelId: id })"
           @toggle-read="toggleRead(second)"
+          @file="(name) => fileIn(second, name)"
         />
       </div>
     </div>

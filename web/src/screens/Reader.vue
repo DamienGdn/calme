@@ -8,13 +8,13 @@ import { notify, notifyError, openEditor } from '../store.ts';
 import MailBody from '../components/MailBody.vue';
 import { richText } from '../format.ts';
 import { isUnread } from '../unread.ts';
-import { actionKinds } from '../actions.ts';
+import { actionKinds, fileTarget } from '../actions.ts';
 import { useUnsubscribe } from '../unsub.ts';
 import UnsubBar from './UnsubBar.vue';
 import ReminderSheet from '../components/ReminderSheet.vue';
 
 const props = defineProps<{ mail: MailItem; busy: boolean }>();
-const emit = defineEmits<{ back: []; archive: []; trash: []; handled: []; label: [id: string, name: string]; toggleRead: [] }>();
+const emit = defineEmits<{ back: []; archive: []; trash: []; handled: []; label: [id: string, name: string]; toggleRead: []; file: [name: string] }>();
 const { t } = useI18n();
 
 const a = computed(() => props.mail.analysis);
@@ -25,6 +25,8 @@ const remind = ref(false);
 /** The suggested action as buttons that do it (unsubscribe, delete, archive, answer, remind me). */
 const kinds = computed(() => (a.value?.action ? actionKinds(a.value.action) : []));
 const unsub = useUnsubscribe(() => props.mail);
+/** "Ranger dans Factures": a button that files the mail there (the folder is made when missing). */
+const folder = computed(() => (a.value?.action ? fileTarget(a.value.action) : null));
 const eventLink = ref<string | null>(null);
 
 async function openMenu() {
@@ -93,7 +95,8 @@ function eventDate(start: string, end: string) {
       <a v-if="actionLinks.get(mail.id)?.via === 'summary'" class="mail-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">
         ↗ {{ actionLinks.get(mail.id)!.label }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }}</span>
       </a>
-      <div v-if="kinds.length" class="act-buttons">
+      <div v-if="kinds.length || folder" class="act-buttons">
+        <button v-if="folder" type="button" class="btn btn-prim" :disabled="busy" @click="emit('file', folder)"><Icon name="folder" :size="16" /> {{ t('reader.fileIn', { name: folder }) }}</button>
         <button v-if="kinds.includes('unsub')" type="button" class="btn btn-prim" :disabled="unsub.status.value !== 'idle'" @click="unsub.go()">
           <Icon name="unsub" :size="16" /> {{ unsub.status.value === 'done' ? t('reader.unsubscribed') : unsub.status.value === 'busy' ? t('reader.unsubscribing') : t('reader.unsubscribe') }}
         </button>

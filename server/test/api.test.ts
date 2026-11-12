@@ -336,6 +336,23 @@ describe('api actions', () => {
     expect(g.calls.some((c) => c.method === 'get')).toBe(false);
   });
 
+  it('files a mail in the folder the action names, creating it when missing', async () => {
+    const { app, g, store } = setup();
+    const file = (id: string, name: unknown) => app.request(`/api/mail/${id}/file`, { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+    expect(await (await file('a', 'factures')).json()).toEqual({ ok: true, labelId: 'Label_1', name: 'Factures', created: false });
+    expect(g.calls.find((c) => c.method === 'modify')?.args).toEqual(['a', ['Label_1'], ['INBOX']]);
+    expect(g.calls.some((c) => c.method === 'createLabel')).toBe(false);
+    expect(store.getMail('a')).toBeNull();
+    expect(await (await file('b', ' Impôts 2026 ')).json()).toEqual({ ok: true, labelId: 'Label_new', name: 'Impôts 2026', created: true });
+    expect(g.calls.find((c) => c.method === 'createLabel')?.args).toEqual(['Impôts 2026']);
+    expect((await file('zzz', 'Factures')).status).toBe(404);
+  });
+
+  it('refuses to file under an empty name', async () => {
+    const { app } = setup();
+    expect((await app.request('/api/mail/a/file', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: '{"name":"  "}' })).status).toBe(400);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });
