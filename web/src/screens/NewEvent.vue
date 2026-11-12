@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
+import { mapsUrl } from '../maps.ts';
 import Icon from '../components/Icon.vue';
 import { notify, notifyError } from '../store.ts';
 
@@ -148,7 +149,7 @@ function onPlaceKey(e: KeyboardEvent) {
     suggestions.value = [];
   }
 }
-const mapUrl = computed(() => (coords.value ? `https://www.openstreetmap.org/?mlat=${coords.value.lat}&mlon=${coords.value.lon}#map=17/${coords.value.lat}/${coords.value.lon}` : ''));
+const mapUrl = computed(() => (coords.value ? mapsUrl(place.value, coords.value) : ''));
 
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
 onMounted(() => window.addEventListener('keydown', onKey));

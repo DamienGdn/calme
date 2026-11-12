@@ -13,6 +13,13 @@ const POLL_MS = 30_000;
 const CALME_HOME = process.env.CALME_HOME || path.join(os.homedir(), '.calme');
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
 
+/** Opens a link outside the app; Apple Plans links go straight to the Plans app on a Mac. */
+function openOutside(url) {
+  const plans = 'https://maps.apple.com/';
+  if (process.platform === 'darwin' && url.startsWith(plans)) shell.openExternal(`maps://${url.slice(plans.length)}`);
+  else shell.openExternal(url);
+}
+
 function loadSettings() {
   let s = {};
   try {
@@ -159,7 +166,7 @@ function createWindow() {
   // Google refuses sign-in inside embedded windows: the Gmail authorisation always opens in the default browser.
   const isGoogleAuth = (url) => /^https?:/i.test(url) && new URL(url).pathname.startsWith('/auth/google');
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/i.test(url)) shell.openExternal(url);
+    if (/^https?:/i.test(url)) openOutside(url);
     return { action: 'deny' };
   });
   win.webContents.on('will-navigate', (e, url) => {
@@ -170,7 +177,7 @@ function createWindow() {
     }
     if (url.startsWith('data:') || new URL(url).origin === origin()) return;
     e.preventDefault();
-    if (/^https?:/i.test(url)) shell.openExternal(url);
+    if (/^https?:/i.test(url)) openOutside(url);
   });
   win.on('close', (e) => {
     if (!quitting) {

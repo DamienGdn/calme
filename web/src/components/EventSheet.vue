@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { dateLocale } from '../i18n.ts';
+import { mapsUrl } from '../maps.ts';
 import Icon from './Icon.vue';
 
 /** An appointment, opened from the agenda: when, which calendar, where (with a map link), notes, Google link. */
@@ -38,7 +39,7 @@ const when = computed(() => {
   const hm = (d: Date) => d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
   return s.toDateString() === en.toDateString() ? `${day(s)}, ${hm(s)} – ${hm(en)}` : `${day(s)} ${hm(s)} → ${day(en)} ${hm(en)}`;
 });
-const mapUrl = computed(() => (props.event.location ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(props.event.location)}` : ''));
+const mapUrl = computed(() => mapsUrl(props.event.location ?? ''));
 
 const onKey = (e: KeyboardEvent) => e.key === 'Escape' && emit('close');
 onMounted(() => window.addEventListener('keydown', onKey));

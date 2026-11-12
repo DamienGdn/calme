@@ -4,6 +4,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import { activity, api, CAT_COLOR, type Category } from './api.ts';
 import GlassLayer from './components/GlassLayer.vue';
+import InstallSheet from './components/InstallSheet.vue';
+import { install, promptInstall } from './install.ts';
 import Icon, { type IconName } from './components/Icon.vue';
 import PairRequests from './components/PairRequests.vue';
 import QuotaGauge from './components/QuotaGauge.vue';
@@ -180,6 +182,13 @@ function unfold(e: MouseEvent, r: Route) {
 
 // Top menu (phone): who is signed in, settings, reminders, version.
 const menuOpen = ref(false);
+/** Install the app: the browser's own prompt where it has one, otherwise a sheet with Safari's gestures. */
+const installSheet = ref(false);
+async function installApp() {
+  menuOpen.value = false;
+  if (install.value === 'prompt') await promptInstall();
+  else installSheet.value = true;
+}
 const account = ref<{ email: string | null; name: string | null } | null>(null);
 watch(
   () => store.state?.gmail,
@@ -258,6 +267,7 @@ const busy = computed(() => Boolean(store.state?.running || store.state?.analyzi
           <span class="grow">{{ t('nav.admin') }}</span>
           <span class="muted" style="font-size: 12px">{{ healthy ? t('nav.adminOk') : t('nav.adminCheck') }}</span>
         </a>
+        <button v-if="install" type="button" class="nav-item" @click="installApp"><Icon name="download" :size="18" /> <span class="grow">{{ t('nav.install') }}</span></button>
         <span class="version mono">Calm {{ version }}</span>
       </div>
     </aside>
@@ -297,6 +307,7 @@ const busy = computed(() => Boolean(store.state?.running || store.state?.analyzi
         <a href="#/couts" class="appmenu-item"><Icon name="chart" :size="18" /> <span class="grow">{{ t('nav.aiCost') }}</span></a>
         <a href="#/desabonnements" class="appmenu-item"><Icon name="unsub" :size="18" /> <span class="grow">{{ t('nav.unsubscribe') }}</span></a>
         <a href="#/ecrire" class="appmenu-item" @click="draft = {}"><Icon name="pen" :size="18" /> <span class="grow">{{ t('nav.newMessage') }}</span></a>
+        <button v-if="install" type="button" class="appmenu-item" @click="installApp"><Icon name="download" :size="18" /> <span class="grow">{{ t('nav.install') }}</span></button>
         <span class="appmenu-version mono">Calm {{ version }}</span>
       </nav>
     </div>
@@ -311,6 +322,7 @@ const busy = computed(() => Boolean(store.state?.running || store.state?.analyzi
       <Icon name="search" :size="22" />
     </a>
 
+    <InstallSheet v-if="installSheet && (install === 'ios' || install === 'mac-safari')" :mode="install" @close="installSheet = false" />
     <PairRequests v-if="onComputer" />
     <div v-if="store.toast" :class="['toast', { err: store.toast.err }]" role="status">
       {{ store.toast.text }}
