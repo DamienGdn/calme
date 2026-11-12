@@ -5,6 +5,7 @@ import { dateLocale } from '../i18n.ts';
 import { post } from '../api.ts';
 import { directionsUrl, mapsUrl } from '../maps.ts';
 import { currentPosition, positionAllowed } from '../position.ts';
+import { useSheetDrag } from '../sheetDrag.ts';
 import Icon from './Icon.vue';
 
 /** An appointment, opened from the agenda: when, which calendar, where (with a map link), notes, Google link. */
@@ -25,6 +26,9 @@ const props = defineProps<{ event: OpenEvent; canDelete?: boolean; busy?: boolea
 const emit = defineEmits<{ close: []; delete: []; edit: [] }>();
 const confirming = ref(false);
 const { t } = useI18n();
+// Pull down to close, push up to edit (when the appointment can be edited).
+const sheetEl = ref<HTMLElement | null>(null);
+useSheetDrag(sheetEl, { onClose: () => emit('close'), onUp: props.canDelete ? () => emit('edit') : undefined });
 
 const when = computed(() => {
   const e = props.event;
@@ -80,7 +84,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 
 <template>
   <div class="sheet-backdrop" @click.self="emit('close')">
-    <article class="sheet rise" role="dialog" aria-modal="true" :aria-label="event.title">
+    <article ref="sheetEl" class="sheet rise" role="dialog" aria-modal="true" :aria-label="event.title">
       <div class="sheet-grip" aria-hidden="true" />
       <header class="sheet-head">
         <span class="eyebrow ev-cal">

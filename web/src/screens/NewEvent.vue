@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, post } from '../api.ts';
 import { mapsUrl } from '../maps.ts';
+import { useSheetDrag } from '../sheetDrag.ts';
 import Icon from '../components/Icon.vue';
 import { notify, notifyError } from '../store.ts';
 
@@ -17,6 +18,9 @@ const props = defineProps<{
   event?: { id?: string; title: string; start: string; end: string; allDay: boolean; location?: string | null; description?: string | null; calendar?: { id?: string } };
   calendars?: { id: string; name: string; color: string; primary: boolean }[] }>();
 const emit = defineEmits<{ done: []; close: [] }>();
+// Pulled down by its grip bar (the fields need the rest of the sheet), the form closes.
+const sheetEl = ref<HTMLElement | null>(null);
+useSheetDrag(sheetEl, { onClose: () => emit('close'), fromTop: true });
 const { t } = useI18n();
 
 const localDay = (d: Date) => d.toLocaleDateString('sv-SE');
@@ -161,7 +165,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="sheet-backdrop" @click.self="emit('close')">
-    <form class="sheet rise" role="dialog" aria-modal="true" :aria-label="t('agenda.newEvent')" @submit.prevent="submit">
+    <form ref="sheetEl" class="sheet rise" role="dialog" aria-modal="true" :aria-label="t('agenda.newEvent')" @submit.prevent="submit">
       <div class="sheet-grip" aria-hidden="true" />
       <header class="sheet-head">
         <button type="button" class="linkish" @click="emit('close')">{{ t('common.cancel') }}</button>

@@ -24,3 +24,13 @@ export function swipeAction(dx: number, width: number, ms: number): 'read' | 'tr
 export function swipeBack(dx: number, width: number, ms: number): boolean {
   return dx > 0 && (dx > Math.min(120, width * 0.3) || flick(dx, ms, 50));
 }
+
+/**
+ * A sheet (popup) dragged vertically: pulled down past a quarter of its height (120 px at most) or flicked down, it
+ * closes; pushed up 80 px or flicked up, it goes to its next step (an appointment opens for editing).
+ */
+export function sheetSwipe(dy: number, ms: number, height: number): 'down' | 'up' | null {
+  if (dy > 0 && (dy > Math.min(120, height / 4) || flick(dy, ms, 50))) return 'down';
+  if (dy < 0 && (-dy > 80 || flick(-dy, ms, 50))) return 'up';
+  return null;
+}
