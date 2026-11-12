@@ -507,7 +507,7 @@ textarea.plain { width: 100%; min-height: 90px; padding: 10px 12px; border-radiu
   .topbar { gap: 8px; }
   .topbar .eyebrow { flex: 1 1 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
   .topbar .btn { padding: 0 14px; font-size: 13px; }
-  .triage-bar .field { flex: 1 1 0; min-width: 0; }
+  .triage-bar .eyebrow { flex: 1 1 0; min-width: 0; }
 
   .headline { font-size: 26px; line-height: 1.12; max-width: none; }
   .segs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }

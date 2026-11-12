@@ -21,7 +21,6 @@ const props = defineProps<{ filter: Category | 'all' }>();
 const { t } = useI18n();
 const ORDER: Category[] = ['reply', 'read', 'news', 'trash'];
 
-const query = ref('');
 const fromNotification = new URLSearchParams(location.search).get('mail');
 if (fromNotification) updateTabs((st) => openTab(st, fromNotification));
 const reading = ref(Boolean(fromNotification));
@@ -33,14 +32,7 @@ const busy = ref(false);
 const canPush = pushSupported() && !window.calmeDesktop;
 
 const emails = computed(() => store.state?.emails ?? []);
-const list = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  return emails.value.filter(
-    (m) =>
-      (props.filter === 'all' || m.analysis?.category === props.filter) &&
-      (!q || `${m.fromName} ${m.fromEmail} ${m.subject} ${m.snippet} ${m.analysis?.summary.join(' ') ?? ''}`.toLowerCase().includes(q)),
-  );
-});
+const list = computed(() => emails.value.filter((m) => props.filter === 'all' || m.analysis?.category === props.filter));
 const byId = (id: string | null) => (id ? (emails.value.find((m) => m.id === id) ?? null) : null);
 const current = computed(() => byId(tabs.value.active) ?? list.value[0] ?? null);
 const second = computed(() => (wide.value ? byId(tabs.value.compare) : null));
@@ -341,20 +333,12 @@ async function turnOnPush() {
     notifyError(e);
   }
 }
-function askCalme() {
-  if (query.value.trim()) goTo('recherche', query.value.trim());
-}
 </script>
 
 <template>
   <div :class="['overview', { 'hide-mobile': reading }]">
     <header class="topbar triage-bar">
       <span class="eyebrow">{{ meta }}</span>
-      <label class="field">
-        <span class="muted" style="display: flex"><Icon name="search" :size="16" /></span>
-        <span class="sr">{{ t('triage.searchLabel') }}</span>
-        <input v-model="query" type="search" :placeholder="t('triage.filterPlaceholder')" @keydown.enter="askCalme" />
-      </label>
       <a href="#/menage" class="btn wide-only" :aria-label="t('nav.cleanup')" :title="t('nav.cleanup')"><Icon name="trash" :size="16" /> <span class="wide-only">{{ t('nav.cleanup') }}</span><span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
       <button v-if="!pushOn && canPush" type="button" class="btn" :aria-label="t('triage.enablePush')" @click="turnOnPush"><Icon name="bell" :size="16" /> <span class="wide-only">{{ t('triage.enablePush') }}</span></button>
       <button type="button" class="btn btn-prim" :disabled="store.state?.running" :aria-label="t('common.sync')" @click="sync">
