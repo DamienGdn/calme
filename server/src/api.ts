@@ -233,6 +233,23 @@ export function createApp(d: Deps) {
 
   app.get('/api/quota', (c) => c.json(quotaUsage()));
 
+  // Badge check from the phone (Admin › Notifications › Test the badge): the last five are kept, so a badge that does
+  // not show can be diagnosed from the computer. Small, flat, no mail data.
+  app.post('/api/diag/badge', async (c) => {
+    const raw = await c.req.text();
+    let body: unknown;
+    try {
+      body = raw.length <= 2000 ? JSON.parse(raw) : null;
+    } catch {
+      body = null;
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ error: 'Diagnostic invalide' }, 400);
+    const flat = Object.fromEntries(Object.entries(body).filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v)).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 300) : v]));
+    const kept = [...metaJson<Record<string, unknown>[]>('badgeDiag', []), { ...flat, at: Date.now() }].slice(-5);
+    store.setMeta('badgeDiag', JSON.stringify(kept));
+    return c.json({ ok: true });
+  });
+
   // Claude's use by Calm (API-price equivalent of each claude -p call), for the cost page.
   const usage = openUsage(store.db);
   app.get('/api/ai-usage', (c) => c.json(usage.summary()));

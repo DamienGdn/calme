@@ -353,6 +353,17 @@ describe('api actions', () => {
     expect((await app.request('/api/mail/a/file', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: '{"name":"  "}' })).status).toBe(400);
   });
 
+  it('keeps the last badge checks sent by the phone, to diagnose it', async () => {
+    const { app, store } = setup();
+    const send = (body: unknown) => app.request('/api/diag/badge', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    for (let i = 0; i < 7; i++) expect((await send({ version: '1.0.0', step: i, result: 'ok' })).status).toBe(200);
+    const kept = JSON.parse(store.getMeta('badgeDiag') ?? '[]');
+    expect(kept).toHaveLength(5);
+    expect(kept.at(-1)).toMatchObject({ version: '1.0.0', step: 6, result: 'ok' });
+    expect(typeof kept.at(-1).at).toBe('number');
+    expect((await app.request('/api/diag/badge', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: 'x'.repeat(5000) })).status).toBe(400);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

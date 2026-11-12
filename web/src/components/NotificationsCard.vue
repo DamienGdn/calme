@@ -19,13 +19,27 @@ const hours = Array.from({ length: 24 }, (_, h) => h);
 const badge = ref(badgeStatus());
 async function tryBadge() {
   const n = (store.state?.emails ?? []).filter(isUnread).length;
+  let result = 'ok';
   try {
     await testBadge(n || 1);
     notify(t('badge.tested', { n: n || 1 }));
   } catch (e) {
+    result = `${(e as Error).name}: ${(e as Error).message}`;
     notifyError(e);
   } finally {
     badge.value = badgeStatus();
+    // Sent to the computer running Calm, so a badge that does not show can be diagnosed there (no mail data).
+    const reg = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+    void post('/api/diag/badge', {
+      version: __APP_VERSION__,
+      result,
+      n: n || 1,
+      ...badge.value,
+      ua: navigator.userAgent,
+      sw: navigator.serviceWorker?.controller?.scriptURL ?? 'none',
+      swActive: reg?.active?.state ?? 'none',
+      swWaiting: Boolean(reg?.waiting),
+    }).catch(() => {});
   }
 }
 
