@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue';
+import { reactive, ref, watch, type Ref } from 'vue';
 import type { Category, MailView } from '../../server/src/types.ts';
 import { farDate } from './dates.ts';
 import { dateLocale, i18n } from './i18n.ts';
@@ -131,6 +131,9 @@ export function when(ts: number): string {
 }
 
 /** Full text of a mail, loaded when it is opened (the list only carries headers). */
+/** The mail's own link behind Calm's suggested action, by mail id (filled when the mail is opened). */
+export const actionLinks = reactive(new Map<string, { url: string; label: string; host: string } | null>());
+
 export function useMailBody(id: Ref<string | undefined>, source: Ref<'inbox' | 'archive' | 'gmail'> = ref('inbox')) {
   const body = ref<string | null>(null);
   watch(
@@ -142,8 +145,9 @@ export function useMailBody(id: Ref<string | undefined>, source: Ref<'inbox' | '
       onCleanup(() => (alive = false));
       const path = src === 'archive' ? '/api/archive/' : src === 'gmail' ? '/api/gmail/' : '/api/mail/';
       try {
-        const m = await api<MailView>(path + encodeURIComponent(mailId));
+        const m = await api<MailView & { actionLink?: { url: string; label: string; host: string } | null }>(path + encodeURIComponent(mailId));
         if (alive) body.value = m.text;
+        if (m.actionLink !== undefined) actionLinks.set(mailId, m.actionLink);
       } catch {
         if (alive) body.value = '';
       }

@@ -979,7 +979,9 @@ html.kb-open .fab { display: none; }
 .remind-due { margin: 0; font-size: 13px; }
 .remind-due::first-letter { text-transform: uppercase; }
 .remind-foot { display: flex; justify-content: flex-end; gap: 10px; }
-.agenda-brief .points li { grid-template-columns: 110px minmax(0, 1fr); }
+.agenda-brief .points li { grid-template-columns: minmax(0, 130px) minmax(0, 1fr); }
+.agenda-brief .points .mono { white-space: normal; line-height: 1.4; }
+@media (max-width: 720px) { .agenda-brief .points li { grid-template-columns: minmax(0, 1fr); gap: 0; } .agenda-brief .points .mono:empty { display: none; } }
 
 /* Search: appointments found in the agenda, under the answer. */
 .search-events { display: flex; flex-direction: column; gap: 4px; }
@@ -1050,3 +1052,32 @@ html.kb-open .fab { display: none; }
 [data-theme='dark'] .avatar-initial { color: oklch(0.9 0.06 var(--h)); background: oklch(0.36 0.07 var(--h)); }
 .avatar-tag { position: absolute; right: -3px; bottom: -3px; width: 12px; height: 12px; border-radius: 4px; border: 2px solid var(--bg); }
 .count-bubble { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--hot); color: #0d0e11; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; line-height: 1; }
+
+/* Phone: round action buttons in each section (Mail: a menu of actions; Reminders, Agenda, Folders: "+"). */
+.dial { display: contents; }
+@media (max-width: 720px) {
+  .fab.fab-round { width: 58px; height: 58px; min-height: 0; padding: 0; justify-content: center; border-radius: 50%; transition: transform 0.25s cubic-bezier(0.3, 1.3, 0.5, 1); }
+  .fab.fab-round.open { transform: rotate(45deg); }
+  .main:has(.split.reading) .fab, .main:has(.selbar) .fab { display: none; }
+  .dial-backdrop { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 55%, transparent); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .dial-items { position: fixed; right: 16px; bottom: calc(var(--bar-bottom) + 146px); z-index: 22; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .dial-item { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border: 1px solid var(--line); border-radius: 999px; background: var(--surf); color: var(--ink); font-size: 15px; font-weight: 600; text-decoration: none; box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.5);
+    animation: dial-in 0.28s cubic-bezier(0.3, 1.3, 0.5, 1) both; animation-delay: calc(var(--i) * 40ms); }
+  @keyframes dial-in { from { opacity: 0; transform: translateY(14px) scale(0.92); } to { opacity: 1; transform: none; } }
+}
+.folder-pick { display: flex; flex-direction: column; max-height: 40vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; }
+.folder-pick-row { display: flex; align-items: center; gap: 10px; min-height: 46px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); font-size: 15px; text-align: left; }
+.folder-pick-row:last-child { border-bottom: 0; }
+.folder-pick-row:hover { background: var(--surf2); }
+.folder-new { display: flex; flex-direction: column; gap: 10px; }
+.folder-new .field { color: var(--ink); }
+.folder-parent { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.folder-parent .select { flex: 1; min-width: 0; }
+.delete-choices { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.delete-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 15px; min-height: 40px; }
+.delete-choice input { width: 18px; height: 18px; accent-color: var(--accent); }
+.delete-choice .select { flex: 1 1 160px; min-width: 0; }
+/* Calm's suggested action as a link to the mail's own page for it (e.g. EcoleDirecte), its site shown. */
+.act-link { text-decoration: none; display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.act-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.act-host { font-family: 'Geist Mono', monospace; font-style: normal; font-size: 11px; letter-spacing: 0.04em; color: var(--muted); text-decoration: none; }

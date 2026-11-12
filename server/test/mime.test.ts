@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMime, formatBody, htmlToText, inlineImages, parseGmailMessage, parseListUnsubscribe } from '../src/mime.ts';
+import { buildMime, formatBody, htmlToText, inlineImages, parseGmailMessage, parseListUnsubscribe, fixMojibake } from '../src/mime.ts';
 import { rawMessage } from './fakeGmail.ts';
 import { part } from './mimeParts.ts';
 
@@ -184,5 +184,29 @@ describe('formatted mail', () => {
     expect(raw).toContain('multipart/alternative');
     expect(part(raw, 'text/plain')).toBe('Salut toi');
     expect(part(raw, 'text/html')).toContain('Salut <strong>toi</strong>');
+  });
+});
+
+describe('accents of mislabelled mails', () => {
+  it('reads UTF-8 bytes as UTF-8 even when the part claims Latin-1', () => {
+    const msg = {
+      id: 'x', threadId: 't', labelIds: ['INBOX'], internalDate: '1',
+      payload: { mimeType: 'text/html', headers: [{ name: 'Content-Type', value: 'text/html; charset=iso-8859-1' }], body: { data: Buffer.from('<p>merci de ne pas répondre</p>', 'utf8').toString('base64url') } },
+    };
+    expect(parseGmailMessage(msg as never).text).toContain('merci de ne pas répondre');
+  });
+
+  it('still reads real Latin-1 as Latin-1', () => {
+    const msg = {
+      id: 'x', threadId: 't', labelIds: ['INBOX'], internalDate: '1',
+      payload: { mimeType: 'text/plain', headers: [{ name: 'Content-Type', value: 'text/plain; charset=iso-8859-1' }], body: { data: Buffer.from('déjà vu', 'latin1').toString('base64url') } },
+    };
+    expect(parseGmailMessage(msg as never).text).toBe('déjà vu');
+  });
+
+  it('repairs text encoded twice (Ã© for é), and leaves sound text alone', () => {
+    expect(fixMojibake('Ceci est un message automatique, merci de ne pas rÃ©pondre et Ã©ventuellement')).toBe('Ceci est un message automatique, merci de ne pas répondre et éventuellement');
+    expect(fixMojibake('Prix : 12 € — Ã la carte')).toBe('Prix : 12 € — Ã la carte');
+    expect(fixMojibake('Ça va très bien')).toBe('Ça va très bien');
   });
 });

@@ -20,7 +20,7 @@ import Search from './screens/Search.vue';
 import Setup from './screens/Setup.vue';
 import Triage from './screens/Triage.vue';
 import { glassBackdrop } from './glass.ts';
-import { draft, openEditor, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
+import { draft, parseHash, refresh, runToastAction, store, type Route } from './store.ts';
 
 const version = __APP_VERSION__;
 /** Access requests from other screens are approved only on the computer running Calm. */
@@ -94,8 +94,8 @@ watch(
 );
 
 watch(
-  () => store.state?.gmail,
-  (g) => {
+  () => [store.state?.gmail, store.labelsVersion] as const,
+  ([g]) => {
     if (g === 'connected') api<{ id: string; name: string }[]>('/api/labels').then((l) => (labels.value = l)).catch(() => (labels.value = []));
   },
 );
@@ -261,7 +261,6 @@ const depth = (name: string) => name.split('/').length - 1;
       </KeepAlive>
     </main>
 
-    <button v-if="['tri', 'dossiers', 'recherche'].includes(route)" type="button" class="fab" @click="openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>
 
     <header class="appbar">
       <span class="appbar-brand">Calm<span class="wordmark-dot">.</span></span>

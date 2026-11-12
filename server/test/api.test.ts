@@ -282,6 +282,46 @@ describe('api actions', () => {
     expect(fetched.length).toBe(before);
   });
 
+  it('creates a folder, and refuses an empty or duplicate name', async () => {
+    const { app, g } = setup();
+    const send = (name: unknown) => app.request('/api/labels', { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+    expect(await (await send('  Maison/Travaux ')).json()).toEqual({ id: 'Label_new', name: 'Maison/Travaux' });
+    expect(g.calls.find((c) => c.method === 'createLabel')?.args).toEqual(['Maison/Travaux']);
+    expect((await send(' ')).status).toBe(400);
+    expect((await send('factures')).status).toBe(409);
+  });
+
+  it('deletes a folder after moving its mails, to another folder or back to the inbox', async () => {
+    const { app, g } = setup();
+    const del = (id: string, moveTo?: string) => app.request(`/api/labels/${id}${moveTo ? `?moveTo=${moveTo}` : ''}`, { method: 'DELETE', headers: auth });
+    expect(await (await del('Label_1', 'Label_2')).json()).toEqual({ ok: true, moved: 2 });
+    expect(g.calls.find((c) => c.method === 'batchModify')?.args).toEqual([['f1', 'f2'], ['Label_2'], ['Label_1']]);
+    expect(g.calls.at(-1)).toEqual({ method: 'deleteLabel', args: ['Label_1'] });
+    await del('Label_2', 'INBOX');
+    expect(g.calls.filter((c) => c.method === 'batchModify').at(-1)?.args).toEqual([['f1', 'f2'], ['INBOX'], ['Label_2']]);
+    const before = g.calls.filter((c) => c.method === 'batchModify').length;
+    expect(await (await del('Label_1')).json()).toEqual({ ok: true, moved: 0 });
+    expect(g.calls.filter((c) => c.method === 'batchModify').length).toBe(before);
+    expect((await del('Label_1', 'Label_1')).status).toBe(400);
+    expect((await del('Label_9')).status).toBe(404);
+    expect((await del('Label_1', 'Label_9')).status).toBe(400);
+  });
+
+  it('moves several mails to a folder and trashes or restores them, found anywhere in Gmail', async () => {
+    const { app, g, store } = setup();
+    const send = (path: string, body: unknown) => app.request(path, { method: 'POST', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await send('/api/mails/move', { ids: ['a', 'old-gmail-id'], labelId: 'Label_2' })).status).toBe(200);
+    expect(g.calls.find((c) => c.method === 'batchModify')?.args).toEqual([['a', 'old-gmail-id'], ['Label_2'], ['INBOX']]);
+    expect(store.getMail('a')).toBeNull();
+    expect((await send('/api/mails/move', { ids: ['b'], labelId: 'Label_9' })).status).toBe(400);
+    expect((await send('/api/mails/trash', { ids: ['b', 'old-gmail-id'] })).status).toBe(200);
+    expect(g.calls.filter((c) => c.method === 'trash').map((c) => c.args[0])).toEqual(['b', 'old-gmail-id']);
+    expect(store.getMail('b')).toBeNull();
+    expect((await send('/api/mails/untrash', { ids: ['b', 'old-gmail-id'] })).status).toBe(200);
+    expect(store.getMail('b')).not.toBeNull();
+    expect((await send('/api/mails/trash', { ids: [] })).status).toBe(400);
+  });
+
   it('archives by removing the INBOX label', async () => {
     const { app, g } = setup();
     await app.request('/api/mail/a/archive', { method: 'POST', headers: auth });

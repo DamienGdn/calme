@@ -41,15 +41,39 @@ function header(part: Part | undefined, name: string): string {
   return h?.value ?? '';
 }
 
+/**
+ * Text encoded twice by its sender (UTF-8 read as Latin-1, then sent as UTF-8: "rÃ©pondre"): each such run is put
+ * back ("répondre"). Runs that do not decode as UTF-8 are left as they are.
+ */
+export function fixMojibake(s: string): string {
+  return s.replace(/[\u00c2-\u00f4][\u0080-\u00bf]+/g, (run) => {
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(run, 'latin1'));
+    } catch {
+      return run;
+    }
+  });
+}
+
+const SINGLE_BYTE = /^(iso-8859-1|iso-8859-15|latin1|windows-1252|cp1252|us-ascii|ascii)$/i;
+
 function decodeBody(part: Part): string {
   const data = part.body?.data;
   if (!data) return '';
   const charset = /charset="?([\w-]+)/i.exec(header(part, 'Content-Type'))?.[1] ?? 'utf-8';
   const bytes = Buffer.from(data, 'base64url');
+  // A part that says Latin-1 but holds valid UTF-8 with accents is UTF-8 (a common mislabel).
+  if (SINGLE_BYTE.test(charset) && bytes.some((b) => b >= 0x80)) {
+    try {
+      return fixMojibake(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    } catch {
+      /* really single-byte */
+    }
+  }
   try {
-    return new TextDecoder(charset).decode(bytes);
+    return fixMojibake(new TextDecoder(charset).decode(bytes));
   } catch {
-    return new TextDecoder('utf-8').decode(bytes);
+    return fixMojibake(new TextDecoder('utf-8').decode(bytes));
   }
 }
 

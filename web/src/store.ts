@@ -48,6 +48,8 @@ export const store = reactive({
   glass: readGlass(),
   /** Bumped when a reminder is saved anywhere, so lists and the agenda reading reload. */
   remindersVersion: 0,
+  /** Bumped when a folder is created or deleted, so the folder lists reload. */
+  labelsVersion: 0,
 });
 
 export interface Draft {

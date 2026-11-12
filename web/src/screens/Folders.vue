@@ -2,9 +2,11 @@
 import { computed, onMounted, ref, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { api, useMailBody, when, type MailItem, fullDate } from '../api.ts';
+import DeleteFolderSheet from '../components/DeleteFolderSheet.vue';
+import FolderSheet from '../components/FolderSheet.vue';
 import Icon from '../components/Icon.vue';
 import MailBody from '../components/MailBody.vue';
-import { notifyError } from '../store.ts';
+import { notify, notifyError, store } from '../store.ts';
 import { useMedia } from '../tabs.ts';
 
 type Label = { id: string; name: string };
@@ -17,7 +19,20 @@ const mails = ref<MailItem[] | null>(null);
 const open = ref<MailItem | null>(null);
 const body = useMailBody(toRef(() => open.value?.id), ref('gmail'));
 
-onMounted(() => api<Label[]>('/api/labels').then((l) => (labels.value = l)).catch(notifyError));
+const loadLabels = () => api<Label[]>('/api/labels').then((l) => (labels.value = l)).catch(notifyError);
+onMounted(loadLabels);
+watch(() => store.labelsVersion, loadLabels);
+const creating = ref(false);
+const deleting = ref(false);
+function created(l: Label) {
+  creating.value = false;
+  notify(t('folders.created', { name: l.name }));
+}
+function deleted() {
+  deleting.value = false;
+  label.value = null;
+  backToIndex();
+}
 
 async function load(l: Label) {
   label.value = l;
@@ -67,6 +82,8 @@ const parentPath = (l: Label) => l.name.split('/').slice(0, -1).join(' / ');
 <template>
   <header class="topbar">
     <span class="eyebrow">{{ t('folders.eyebrow') }}{{ label ? ` · ${label.name}` : '' }}</span>
+    <button v-if="label" type="button" class="btn btn-danger wide-only" @click="deleting = true"><Icon name="trash" :size="16" /> {{ t('folders.delete') }}</button>
+    <button type="button" class="btn btn-prim wide-only" @click="creating = true"><Icon name="plus" :size="16" /> {{ t('folders.newTitle') }}</button>
   </header>
 
   <template v-if="!(phone && label)">
@@ -97,6 +114,7 @@ const parentPath = (l: Label) => l.name.split('/').slice(0, -1).join(' / ');
     <span v-if="parentPath(label)" class="eyebrow">{{ parentPath(label) }}</span>
     <h1 class="folder-title">{{ leaf(label) }}</h1>
     <span class="muted mono" style="font-size: 12px">{{ mails ? t('folders.count', mails.length) : t('common.loading') }}</span>
+    <button type="button" class="linkish" style="align-self: flex-start; color: var(--hot)" @click="deleting = true">{{ t('folders.delete') }}</button>
   </div>
 
   <div v-if="label" :class="['split', { reading: open }]">
@@ -128,4 +146,8 @@ const parentPath = (l: Label) => l.name.split('/').slice(0, -1).join(' / ');
       </div>
     </div>
   </div>
+
+  <FolderSheet v-if="creating" mode="create" :title="t('folders.newTitle')" :parent="label?.name" @close="creating = false" @created="created" />
+  <DeleteFolderSheet v-if="deleting && label" :label="label" :count="mails?.length ?? null" @close="deleting = false" @deleted="deleted" />
+  <button v-if="!open" type="button" class="fab fab-round" :aria-label="t('folders.newTitle')" @click="creating = true"><Icon name="plus" :size="24" /></button>
 </template>

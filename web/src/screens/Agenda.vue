@@ -189,7 +189,7 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
 <template>
   <header class="topbar">
     <span class="eyebrow">{{ t('agenda.eyebrow') }}</span>
-    <button type="button" class="btn btn-prim" :aria-label="t('agenda.newEvent')" @click="openForm()"><Icon name="calendar" :size="16" /> <span class="wide-only">{{ t('agenda.newEvent') }}</span><span class="phone-only">+</span></button>
+    <button type="button" class="btn btn-prim wide-only" :aria-label="t('agenda.newEvent')" @click="openForm()"><Icon name="calendar" :size="16" /> {{ t('agenda.newEvent') }}</button>
   </header>
 
   <h1 class="headline" style="max-width: 18ch">
@@ -290,4 +290,5 @@ watch(mode, (m) => m === 'liste' && listEvents.value === null && void loadList(t
       <button v-if="view?.connected" type="button" class="btn" style="align-self: flex-start" :disabled="loadingMore" @click="more">{{ loadingMore ? t('common.loading') : t('agenda.more') }}</button>
     </section>
   </template>
+  <button v-if="!form && !opened" type="button" class="fab fab-round" :aria-label="t('agenda.newEvent')" @click="openForm()"><Icon name="plus" :size="24" /></button>
 </template>

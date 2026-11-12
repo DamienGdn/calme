@@ -10,7 +10,8 @@ import { GmailDisconnected, type GmailPort } from './gmail.ts';
 import type { Notifier } from './notify.ts';
 import type { Store } from './store.ts';
 import { safeMailHtml } from './mailHtml.ts';
-import { decodeEntities, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
+import { decodeEntities, fixMojibake, inlineImages, parseAddress, parseGmailMessage } from './mime.ts';
+import { actionLink } from './links.ts';
 import { adviseNewsletters, scanNewsletters, unsubscribedSenders } from './newsletters.ts';
 import { getSettings, saveSettings } from './settings.ts';
 import { quotaUsage, SCOPES, validateCredentials } from './gmail.ts';
@@ -287,6 +288,34 @@ export function createApp(d: Deps) {
 
   app.get('/api/labels', async (c) => c.json(await gmail().listLabels()));
 
+  // Folders (Gmail labels): created and deleted from Calm. Deleting one never deletes mail: its mails first go to
+  // another folder or back to the inbox when asked, otherwise they stay in Gmail's "All mail".
+  app.post('/api/labels', async (c) => {
+    const { name } = await c.req.json<{ name?: unknown }>();
+    const clean = typeof name === 'string' ? name.trim().replace(/\s*\/\s*/g, '/').replace(/^\/+|\/+$/g, '') : '';
+    if (!clean || clean.length > 200) return c.json({ error: 'Nom de dossier invalide' }, 400);
+    const g = gmail();
+    if ((await g.listLabels()).some((l) => l.name.toLowerCase() === clean.toLowerCase())) return c.json({ error: 'Ce dossier existe déjà' }, 409);
+    return c.json(await g.createLabel(clean));
+  });
+
+  app.delete('/api/labels/:id', async (c) => {
+    const id = c.req.param('id');
+    const moveTo = c.req.query('moveTo') || null;
+    const g = gmail();
+    const labels = await g.listLabels();
+    if (!labels.some((l) => l.id === id)) return c.json({ error: 'Dossier introuvable' }, 404);
+    if (moveTo && (moveTo === id || (moveTo !== 'INBOX' && !labels.some((l) => l.id === moveTo)))) return c.json({ error: 'Destination invalide' }, 400);
+    let moved = 0;
+    if (moveTo) {
+      const ids = await g.labelMessageIds(id);
+      if (ids.length) await g.batchModify(ids, [moveTo], [id]);
+      moved = ids.length;
+    }
+    await g.deleteLabel(id);
+    return c.json({ ok: true, moved });
+  });
+
   // Gmail folders (labels): browsed live from Gmail, read-only, never triaged.
   app.get('/api/labels/:id/messages', async (c) => {
     const g = gmail();
@@ -323,14 +352,15 @@ export function createApp(d: Deps) {
     const msg = await g.get(id);
     let html = parseGmailMessage(msg).html ?? '';
     if (/\bcid:/i.test(html)) html = await embedImages(g, id, html, msg);
-    return c.json({ html: html ? safeMailHtml(html) : null });
+    return c.json({ html: html ? fixMojibake(safeMailHtml(html)) : null });
   });
 
   app.get('/api/mail/:id', (c) => {
     const m = store.getMail(c.req.param('id'));
     if (!m) return c.json({ error: 'Mail introuvable' }, 404);
     const { html: _html, ...rest } = m;
-    return c.json(rest);
+    // Mails stored before the accent repair (mime.ts) are put right when shown.
+    return c.json({ ...rest, text: fixMojibake(rest.text), subject: fixMojibake(rest.subject), actionLink: actionLink(m.analysis?.action ?? '', m.html ?? '', m.text) });
   });
 
   // The mail's formatted version, cleaned (mailHtml.ts). Mails stored before Calm kept HTML get it from Gmail once.
@@ -351,7 +381,7 @@ export function createApp(d: Deps) {
       html = await embedImages(g, id, html, full ?? (await g.get(id)));
       store.setHtml(id, html);
     }
-    return c.json({ html: html ? safeMailHtml(html) : null });
+    return c.json({ html: html ? fixMojibake(safeMailHtml(html)) : null });
   });
 
   app.post('/api/sync', async (c) => {
@@ -385,6 +415,39 @@ export function createApp(d: Deps) {
     if (!Array.isArray(ids) || !ids.length || ids.length > 500 || !ids.every((x) => typeof x === 'string') || typeof read !== 'boolean')
       return c.json({ error: 'ids et read attendus' }, 400);
     await setRead(gmail(), store, ids as string[], read);
+    return c.json({ ok: true });
+  });
+
+  // Several mails at once (selection in the inbox or in a search, so possibly older mail Calm does not keep):
+  // moved to a folder (out of the inbox), trashed (Gmail trash, 30 days), or brought back from the trash.
+  const idList = (v: unknown): string[] | null =>
+    Array.isArray(v) && v.length && v.length <= 500 && v.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x)) ? (v as string[]) : null;
+
+  app.post('/api/mails/move', async (c) => {
+    const b = await c.req.json<{ ids?: unknown; labelId?: unknown }>();
+    const ids = idList(b.ids);
+    const g = gmail();
+    if (!ids || typeof b.labelId !== 'string' || !(await g.listLabels()).some((l) => l.id === b.labelId)) return c.json({ error: 'Mails ou dossier invalides' }, 400);
+    await g.batchModify(ids, [b.labelId], ['INBOX']);
+    store.removeFromInbox(ids);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/mails/trash', async (c) => {
+    const ids = idList((await c.req.json<{ ids?: unknown }>()).ids);
+    if (!ids) return c.json({ error: 'Mails invalides' }, 400);
+    const g = gmail();
+    for (const id of ids) await g.trash(id);
+    store.removeFromInbox(ids);
+    return c.json({ ok: true });
+  });
+
+  app.post('/api/mails/untrash', async (c) => {
+    const ids = idList((await c.req.json<{ ids?: unknown }>()).ids);
+    if (!ids) return c.json({ error: 'Mails invalides' }, 400);
+    const g = gmail();
+    for (const id of ids) await g.untrash(id);
+    store.restoreToInbox(ids.filter((id) => store.known(id)));
     return c.json({ ok: true });
   });
 

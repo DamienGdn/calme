@@ -3,13 +3,15 @@ import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue
 import { useI18n } from 'vue-i18n';
 import { CAT_CLASS, CAT_COLOR, post, when, type Category, type MailItem } from '../api.ts';
 import Icon from '../components/Icon.vue';
+import FolderSheet from '../components/FolderSheet.vue';
 import SenderAvatar from '../components/SenderAvatar.vue';
+import { pickWith, toggleKey } from '../selection.ts';
 import SwipeRow from '../components/SwipeRow.vue';
 import TabBar from '../components/TabBar.vue';
 import { axis, swipeBack } from '../gestures.ts';
 import { dateLocale } from '../i18n.ts';
 import { enablePush, isSubscribed, pushSupported } from '../push.ts';
-import { goTo, notify, notifyError, refresh, setRead, store } from '../store.ts';
+import { goTo, notify, notifyError, openEditor, refresh, setRead, store } from '../store.ts';
 import { closeTab, cycleTab, openTab, pruneTabs, toggleCompare } from '../tabLogic.ts';
 import { tabs, updateTabs, useMedia } from '../tabs.ts';
 import { isUnread } from '../unread.ts';
@@ -117,10 +119,10 @@ function toggleRead(m: MailItem) {
 // Selection: long press (phone) or ⇧-click starts it; while selecting, a tap toggles a mail.
 const selected = ref(new Set<string>());
 const selecting = computed(() => selected.value.size > 0);
+let anchor: string | null = null;
 function toggleSelected(id: string) {
-  const next = new Set(selected.value);
-  if (!next.delete(id)) next.add(id);
-  selected.value = next;
+  selected.value = pickWith(selected.value, list.value.map((m) => m.id), id, anchor, 'toggle');
+  anchor = id;
 }
 const clearSelection = () => (selected.value = new Set());
 const selectAll = () => (selected.value = new Set(list.value.map((m) => m.id)));
@@ -129,10 +131,36 @@ watch(emails, (all) => {
   if ([...selected.value].some((id) => !ids.has(id))) selected.value = new Set([...selected.value].filter((id) => ids.has(id)));
 });
 
+/** ⇧-click: the range from the last clicked mail · ⌘ (Mac) / Ctrl-click, or a tap while selecting: one mail more or less. */
 function onRowClick(e: MouseEvent, m: MailItem) {
-  if (selecting.value || e.shiftKey) toggleSelected(m.id);
-  else select(m, e.metaKey || e.ctrlKey);
+  if (e.shiftKey) {
+    selected.value = pickWith(selected.value, list.value.map((x) => x.id), m.id, anchor ?? (selecting.value ? null : current.value?.id ?? null), 'range');
+    anchor = m.id;
+  } else if (toggleKey(e) || selecting.value) toggleSelected(m.id);
+  else select(m);
 }
+
+// Moving the selection to a folder (out of the inbox).
+const moving = ref(false);
+async function moveSelection(l: { id: string; name: string }) {
+  const ids = [...selected.value];
+  moving.value = false;
+  if (!ids.length) return;
+  busy.value = true;
+  try {
+    await post('/api/mails/move', { ids, labelId: l.id });
+    clearSelection();
+    notify(t('folders.moved', { n: ids.length, name: l.name }, ids.length));
+    await refresh();
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
+// Phone: one action button, opening Write, Clean-up and Unsubscribe.
+const dial = ref(false);
 
 /** Undo for trash: Gmail untrashes, the mails come back to the inbox. */
 const undoTrash = (ids: string[]) => ({
@@ -245,7 +273,16 @@ function onKey(e: KeyboardEvent) {
     updateTabs((st) => cycleTab(st, e.shiftKey ? -1 : 1));
     return;
   }
+  if (toggleKey(e) && !e.altKey && e.key.toLowerCase() === 'a' && onPage && list.value.length) {
+    e.preventDefault();
+    selectAll();
+    return;
+  }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'Escape' && dial.value) {
+    dial.value = false;
+    return;
+  }
   if (e.key === 'Escape' && selecting.value) {
     clearSelection();
     return;
@@ -316,7 +353,7 @@ function askCalme() {
         <span class="sr">{{ t('triage.searchLabel') }}</span>
         <input v-model="query" type="search" :placeholder="t('triage.filterPlaceholder')" @keydown.enter="askCalme" />
       </label>
-      <a href="#/menage" class="btn" :aria-label="t('nav.cleanup')" :title="t('nav.cleanup')"><Icon name="trash" :size="16" /> <span class="wide-only">{{ t('nav.cleanup') }}</span><span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
+      <a href="#/menage" class="btn wide-only" :aria-label="t('nav.cleanup')" :title="t('nav.cleanup')"><Icon name="trash" :size="16" /> <span class="wide-only">{{ t('nav.cleanup') }}</span><span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
       <button v-if="!pushOn && canPush" type="button" class="btn" :aria-label="t('triage.enablePush')" @click="turnOnPush"><Icon name="bell" :size="16" /> <span class="wide-only">{{ t('triage.enablePush') }}</span></button>
       <button type="button" class="btn btn-prim" :disabled="store.state?.running" :aria-label="t('common.sync')" @click="sync">
         <Icon name="refresh" :size="16" /> <span class="wide-only">{{ store.state?.running ? t('common.syncing') : t('common.sync') }}</span>
@@ -372,6 +409,7 @@ function askCalme() {
         <button type="button" class="btn btn-icon" :aria-label="t('triage.clearSelection')" @click="clearSelection">×</button>
         <span class="grow">{{ t('triage.selected', selected.size) }}</span>
         <button type="button" class="btn" @click="selectAll">{{ t('triage.selectAll') }}</button>
+        <button type="button" class="btn" :disabled="busy" @click="moving = true"><Icon name="move" :size="16" /> {{ t('triage.move') }}</button>
         <button type="button" class="btn" @click="readSelection"><Icon name="mail" :size="16" /> {{ selectionUnread ? t('triage.markRead') : t('triage.markUnread') }}</button>
         <button type="button" class="btn btn-danger" :disabled="busy" @click="trashSelection"><Icon name="trash" :size="16" /> {{ t('triage.trashShort') }}</button>
       </div>
@@ -392,7 +430,8 @@ function askCalme() {
           :aria-pressed="selecting ? selected.has(m.id) : undefined"
           :title="t('tabs.rowHint')"
           @click="onRowClick($event, m)"
-          @auxclick="$event.button === 1 && select(m, true)"
+          @auxclick="$event.button === 1 && ($event.preventDefault(), select(m, true))"
+          @mousedown="$event.button === 1 && $event.preventDefault()"
         >
           <span v-if="selecting" class="pick" aria-hidden="true"><Icon v-if="selected.has(m.id)" name="check" :size="12" /></span>
           <SenderAvatar v-else :name="m.fromName" :email="m.fromEmail" :tag="m.analysis ? CAT_COLOR[m.analysis.category] : undefined" />
@@ -450,5 +489,17 @@ function askCalme() {
         />
       </div>
     </div>
+  </div>
+
+  <FolderSheet v-if="moving" mode="pick" :title="t('folders.moveTitle')" @close="moving = false" @pick="moveSelection" />
+
+  <div v-if="!selecting && !(phone && reading)" class="dial">
+    <div v-if="dial" class="dial-backdrop" @click="dial = false" />
+    <div v-if="dial" class="dial-items" role="menu">
+      <a href="#/desabonnements" role="menuitem" class="dial-item" style="--i: 2" @click="dial = false"><Icon name="unsub" :size="18" /> {{ t('nav.unsubscribe') }}</a>
+      <a href="#/menage" role="menuitem" class="dial-item" style="--i: 1" @click="dial = false"><Icon name="trash" :size="18" /> {{ t('nav.cleanup') }}<span v-if="cleanable" class="count-bubble">{{ cleanable }}</span></a>
+      <button type="button" role="menuitem" class="dial-item" style="--i: 0" @click="dial = false; openEditor({})"><Icon name="pen" :size="18" /> {{ t('nav.write') }}</button>
+    </div>
+    <button type="button" :class="['fab', 'fab-round', { open: dial }]" :aria-label="t('triage.actions')" :aria-expanded="dial" @click="dial = !dial"><Icon name="plus" :size="24" /></button>
   </div>
 </template>

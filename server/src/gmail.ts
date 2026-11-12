@@ -26,6 +26,13 @@ export interface GmailPort {
   attachment(messageId: string, attachmentId: string): Promise<string>;
   send(raw: string, threadId?: string): Promise<void>;
   listLabels(): Promise<{ id: string; name: string }[]>;
+  createLabel(name: string): Promise<{ id: string; name: string }>;
+  /** Removes the label from Gmail; its mails stay (in All mail, or wherever their other labels put them). */
+  deleteLabel(id: string): Promise<void>;
+  /** Every mail carrying the label (5,000 at most). */
+  labelMessageIds(labelId: string): Promise<string[]>;
+  /** Adds and removes labels on many mails at once (1,000 per call). */
+  batchModify(ids: string[], add: string[], remove: string[]): Promise<void>;
   profileEmail(): Promise<string>;
   /** The name mails are sent under (main address), '' when none is set. */
   displayName(): Promise<string>;
@@ -100,7 +107,7 @@ function isRateLimit(e: unknown): boolean {
  * Every call takes its cost from a shared 5,000-unit budget (safety margin), then runs;
  * a 429 still slipping through is retried after a pause.
  */
-export const COST = { list: 5, getFull: 60, getMeta: 20, modify: 5, trash: 20, untrash: 20, attachment: 5, send: 100, labels: 1, profile: 1 } as const;
+export const COST = { list: 5, getFull: 60, getMeta: 20, modify: 5, batchModify: 50, trash: 20, untrash: 20, attachment: 5, send: 100, labels: 1, labelEdit: 5, profile: 1 } as const;
 const take = createThrottle(5000);
 
 /** Gmail's own per-user limit, shown in the quota gauge (Calm keeps below its 5,000-unit budget). */
@@ -189,6 +196,29 @@ export function createGmailPort(auth: OAuth2Client, background = false): GmailPo
       const res = await call(COST.list, () => users.settings.sendAs.list({ userId: 'me' }));
       const all = res.data.sendAs ?? [];
       return (all.find((a) => a.isPrimary) ?? all.find((a) => a.isDefault) ?? all[0])?.displayName ?? '';
+    },
+    async createLabel(name) {
+      const res = await call(COST.labelEdit, () => users.labels.create({ userId: 'me', requestBody: { name, labelListVisibility: 'labelShow', messageListVisibility: 'show' } }));
+      return { id: res.data.id ?? '', name: res.data.name ?? name };
+    },
+    async deleteLabel(id) {
+      await call(COST.labelEdit, () => users.labels.delete({ userId: 'me', id }));
+    },
+    async labelMessageIds(labelId) {
+      const ids: string[] = [];
+      let pageToken: string | undefined;
+      do {
+        const res = await call(COST.list, () => users.messages.list({ userId: 'me', labelIds: [labelId], maxResults: 500, pageToken, includeSpamTrash: false }));
+        for (const m of res.data.messages ?? []) if (m.id) ids.push(m.id);
+        pageToken = res.data.nextPageToken ?? undefined;
+      } while (pageToken && ids.length < 5000);
+      return ids;
+    },
+    async batchModify(ids, addLabelIds, removeLabelIds) {
+      for (let i = 0; i < ids.length; i += 1000) {
+        const chunk = ids.slice(i, i + 1000);
+        await call(COST.batchModify, () => users.messages.batchModify({ userId: 'me', requestBody: { ids: chunk, addLabelIds, removeLabelIds } }));
+      }
     },
     async profileEmail() {
       return (await call(COST.profile, () => users.getProfile({ userId: 'me' }))).data.emailAddress ?? '';

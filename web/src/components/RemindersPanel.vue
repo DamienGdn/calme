@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onActivated, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, type Reminder } from '../api.ts';
+import { api, post, type Reminder } from '../api.ts';
 import { dateLocale } from '../i18n.ts';
 import { dueGroup, type DueGroup } from '../remind.ts';
-import { goTo, notifyError, store } from '../store.ts';
+import { goTo, notify, notifyError, store } from '../store.ts';
 import { openTab } from '../tabLogic.ts';
 import { updateTabs } from '../tabs.ts';
 import Icon from './Icon.vue';
@@ -50,6 +50,27 @@ async function toggle(r: Reminder) {
   }
 }
 
+/** Deleted at once, with Undo (the reminder comes back as it was, minus its link to a mail that left the inbox). */
+async function remove(r: Reminder) {
+  try {
+    await api(`/api/reminders/${encodeURIComponent(r.id)}`, { method: 'DELETE' });
+    store.remindersVersion++;
+    notify(t('remind.deleted'), false, {
+      label: t('common.undo'),
+      run: async () => {
+        try {
+          await post('/api/reminders', { text: r.text, due: r.due, early: r.early, mailId: inInbox(r.mailId) ? r.mailId : undefined });
+          store.remindersVersion++;
+        } catch (e) {
+          notifyError(e);
+        }
+      },
+    });
+  } catch (e) {
+    notifyError(e);
+  }
+}
+
 function openMail(id: string) {
   updateTabs((st) => openTab(st, id));
   goTo('tri');
@@ -60,7 +81,7 @@ function openMail(id: string) {
   <section class="reminders" :aria-label="t('remind.title')">
     <div class="reminders-head">
       <h2 class="eyebrow" style="margin: 0; font-weight: 500; display: flex; align-items: center; gap: 8px"><Icon name="clock" :size="14" /> {{ t('remind.title') }}</h2>
-      <button type="button" class="btn" style="min-height: 36px" @click="adding = true">+ {{ t('remind.new') }}</button>
+      <button type="button" class="btn wide-only" style="min-height: 36px" @click="adding = true">+ {{ t('remind.new') }}</button>
     </div>
 
     <p v-if="list && !groups.length && !(props.compact && done.length)" class="empty" style="margin: 0">{{ t('remind.empty') }}</p>
@@ -77,6 +98,7 @@ function openMail(id: string) {
           </span>
         </button>
         <button v-if="inInbox(r.mailId)" type="button" class="btn btn-icon" :aria-label="t('remind.openMail')" :title="t('remind.openMail')" @click="openMail(r.mailId!)"><Icon name="mail" :size="16" /></button>
+        <button type="button" class="btn btn-icon rem-del" :aria-label="t('remind.deleteOne', { text: r.text })" :title="t('remind.delete')" @click="remove(r)"><Icon name="trash" :size="16" /></button>
       </div>
     </div>
 
@@ -85,10 +107,12 @@ function openMail(id: string) {
       <div v-for="r in done" :key="r.id" class="rem is-done">
         <button type="button" class="rem-check on" :aria-label="t('remind.markOpen', { text: r.text })" @click="toggle(r)"><Icon name="check" :size="12" /></button>
         <button type="button" class="rem-body" @click="editing = r"><span class="rem-text">{{ r.text }}</span></button>
+        <button type="button" class="btn btn-icon rem-del" :aria-label="t('remind.deleteOne', { text: r.text })" :title="t('remind.delete')" @click="remove(r)"><Icon name="trash" :size="16" /></button>
       </div>
     </details>
 
     <ReminderSheet v-if="adding" @close="adding = false" />
+    <button v-if="!props.compact" type="button" class="fab fab-round" :aria-label="t('remind.new')" @click="adding = true"><Icon name="plus" :size="24" /></button>
     <ReminderSheet v-if="editing" :reminder="editing" @close="editing = null" />
   </section>
 </template>

@@ -93,7 +93,21 @@ export function fakeGmail(ids: string[] = []) {
       record('send', raw, threadId);
     },
     async listLabels() {
-      return [{ id: 'Label_1', name: 'Factures' }];
+      return [{ id: 'Label_1', name: 'Factures' }, { id: 'Label_2', name: 'Maison' }];
+    },
+    async createLabel(name) {
+      record('createLabel', name);
+      return { id: 'Label_new', name };
+    },
+    async deleteLabel(id) {
+      record('deleteLabel', id);
+    },
+    async labelMessageIds(labelId) {
+      record('labelMessageIds', labelId);
+      return ['f1', 'f2'];
+    },
+    async batchModify(ids, add, remove) {
+      record('batchModify', ids, add, remove);
     },
     async displayName() {
       return 'Camille Test';

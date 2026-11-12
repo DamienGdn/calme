@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { api, CAT_COLOR, post, useMailBody, when, type MailItem, fullDate } from '../api.ts';
+import { actionLinks, api, CAT_COLOR, post, useMailBody, when, type MailItem, fullDate } from '../api.ts';
 import Icon from '../components/Icon.vue';
 import { dateLocale } from '../i18n.ts';
 import { notify, notifyError, openEditor } from '../store.ts';
@@ -83,7 +83,8 @@ function eventDate(start: string, end: string) {
       <ol>
         <li v-for="(s, i) in a.summary" :key="i"><span>0{{ i + 1 }}</span><span>{{ s }}</span></li>
       </ol>
-      <span v-if="a.action" class="act">→ {{ a.action }}</span>
+      <a v-if="a.action && actionLinks.get(mail.id)" class="act act-link" :href="actionLinks.get(mail.id)!.url" target="_blank" rel="noopener noreferrer">→ {{ a.action }} <span class="act-host mono">{{ actionLinks.get(mail.id)!.host }} ↗</span></a>
+      <span v-else-if="a.action" class="act">→ {{ a.action }}</span>
     </section>
 
     <section v-if="a?.event" class="event-card" :aria-label="t('reader.eventFound')">
